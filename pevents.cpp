@@ -182,6 +182,7 @@ namespace neosmart
 				if(!waitAll && wfmo->EventStatus[i])
 				{
 					waitIndex = i;
+					break;
 				}
 				if(waitAll && !wfmo->EventStatus[i])
 				{
