@@ -1,5 +1,5 @@
 /*
- * WIN32 Events for Posix
+ * WIN32 Events for POSIX
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
  * Copyright (C) 2011 by NeoSmart Technologies
  * This code is released under the terms of the MIT License
