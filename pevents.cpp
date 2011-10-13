@@ -8,7 +8,7 @@ namespace neosmart
 		bool AutoReset;
 		pthread_cond_t CVariable;
 		pthread_mutex_t Mutex;
-		volatile bool State;
+		bool State;
 	};
 	
 	neosmart_event_t CreateEvent(bool manualReset, bool initialState)
