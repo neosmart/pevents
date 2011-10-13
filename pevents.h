@@ -1,3 +1,10 @@
+/*
+ * WIN32 Events for Posix
+ * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
+ * Copyright (C) 2011 by NeoSmart Technologies
+ * This code is released under the terms of the MIT License
+ */
+
 #pragma once
 
 #include <pthread.h>
