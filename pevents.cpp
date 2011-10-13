@@ -40,7 +40,8 @@ namespace neosmart
 	
 		if(!event->State)
 		{   
-			//Regardless of whether it's an auto-reset or manual-reset event
+			//Regardless of whether it's an auto-reset or manual-reset event:
+            //wait to obtain the event, then lock anyone else out
 			if(milliseconds != -1)
 			{
                 timeval tv;
@@ -55,22 +56,29 @@ namespace neosmart
 				
 				result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
                 if(result == 0)
+                {
+                    //We've only accquired the event if the wait succeeded
                     event->State = false;
+                }
 			}
 			else
 			{
 				result = pthread_cond_wait(&event->CVariable, &event->Mutex);
-                event->State = false;
+                if(result == 0)
+                {
+                    event->State = false;
+                }
 			}
 		}
 		else if(event->AutoReset)
 		{
-			//It's an auto-reset event that's currently available
+			//It's an auto-reset event that's currently available;
 			//we need to stop anyone else from using it
             result = 0;
 			event->State = false;
 		}
-		//Else it's a manual reset with an available state - nothing to do
+		//Else we're trying to obtain a manual reset event with a signalled state;
+        //don't do anything
 		
 		pthread_mutex_unlock(&event->Mutex);
 		
