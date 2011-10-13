@@ -159,19 +159,29 @@ namespace neosmart
 			pthread_mutex_unlock(&events[i]->Mutex);
 		}
 		
-		timeval tv;
-		gettimeofday(&tv, NULL);
-		
-		uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
-		
 		timespec ts;
-		ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
-		ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
+		if(milliseconds != -1)
+		{
+			timeval tv;
+			gettimeofday(&tv, NULL);
+			
+			uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
+			
+			ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
+			ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
+		}
 		
 		bool done = false;
 		while(!done)
 		{
-			result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
+			if(milliseconds != -1)
+			{
+				result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
+			}
+			else
+			{
+				result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
+			}
 			if(result != 0)
 				break;
 			
