@@ -30,7 +30,9 @@ int main()
     
     for(int i = 0; i < 25; ++i)
     {
-        if(WaitForEvent(event, 500) != 0)
+//        if(WaitForEvent(event, 500) != 0)
+		int index;
+        if(WaitForMultipleEvents(&event, 1, true, 500, index) != 0)
             cout << "Timeout!" << endl;
         else
             cout << shared << endl;

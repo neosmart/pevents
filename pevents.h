@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#define WFMO 1
+
 namespace neosmart
 {
     //Type declarations
@@ -22,6 +24,9 @@ namespace neosmart
 	int WaitForEvent(neosmart_event_t event, uint32_t milliseconds = -1);
 	int SetEvent(neosmart_event_t event);
 	int ResetEvent(neosmart_event_t event);
+#ifdef WFMO
+	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &index);
+#endif
     
     //POSIX-style functions
     //TBD
