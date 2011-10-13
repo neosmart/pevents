@@ -71,7 +71,7 @@ namespace neosmart
 		return event;
 	}
 	
-	int WaitForEvent(neosmart_event_t event, uint32_t milliseconds)
+	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
 		if(result != 0)
