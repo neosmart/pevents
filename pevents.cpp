@@ -54,8 +54,7 @@ namespace neosmart
 				timeval tv;
 				gettimeofday(&tv, NULL);
 				
-				uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 
-                + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
+				uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
 				
 				timespec ts;
 				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
