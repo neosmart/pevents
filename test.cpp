@@ -6,37 +6,53 @@
 using namespace neosmart;
 using namespace std;
 
-void *test(void *param);
+void *numbers(void *param);
+void *letters(void *param);
 
-neosmart_event_t event;
-int shared;
+neosmart_event_t event[2];
+char letter;
+int number;
 
-void *test(void *param)
+void *letters(void *param)
 {
-    for(int i = 0; ; ++i)
-    {
-        shared = i;
-        SetEvent(event);
-        sleep(1);
-    }
+	for(int i = 0; ; ++i)
+	{
+		letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i%26];
+		SetEvent(event[0]);
+		sleep(3);
+	}
+}
+
+void *numbers(void *param)
+{
+	for(int i = 0; ; ++i)
+	{
+		number = i;
+		SetEvent(event[1]);
+		sleep(4);
+	}
 }
 
 int main()
 {
-    event = CreateEvent();
-    
-    pthread_t thread;
-    pthread_create(&thread, NULL, test, NULL);
-    
-    for(int i = 0; i < 25; ++i)
-    {
-//        if(WaitForEvent(event, 500) != 0)
+	event[0] = CreateEvent();
+	event[1] = CreateEvent();
+	
+	pthread_t thread1, thread2;
+	pthread_create(&thread1, NULL, letters, NULL);
+	pthread_create(&thread2, NULL, numbers, NULL);
+	
+	for(int i = 0; i < 25; ++i)
+	{
 		int index;
-        if(WaitForMultipleEvents(&event, 1, true, 500, index) != 0)
-            cout << "Timeout!" << endl;
-        else
-            cout << shared << endl;
-    }
-    
-    DestroyEvent(event);
+		if(WaitForMultipleEvents(event, 2, false, -1, index) != 0)
+			cout << "Timeout!" << endl;
+		else if(index == 0)
+			cout << letter << endl;
+		else if(index == 1)
+			cout << number << endl;
+	}
+	
+	DestroyEvent(event[0]);
+	DestroyEvent(event[1]);
 }
