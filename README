@@ -31,7 +31,7 @@ identical underneath the hood.
 
 WIN32-style pevents API:
 
-	neosmart_event_t CreateEvent(bool manualReset, bool	initialState);
+	neosmart_event_t CreateEvent(bool manualReset, bool initialState);
 	
 	int DestroyEvent(neosmart_event_t event);
 	
