@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <stdint.h>
 
+//Comment out the #define below to disable WFMO support if not used (recommended)
+//Compiling with WFMO support will add some overhead to all event objects
 #define WFMO 1
 
 namespace neosmart
