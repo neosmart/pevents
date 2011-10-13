@@ -44,48 +44,48 @@ namespace neosmart
 		int result = pthread_mutex_lock(&event->Mutex);
 		if(result != 0)
 			return result;
-	
+        
 		if(!event->State)
-		{   
+		{	
 			//Regardless of whether it's an auto-reset or manual-reset event:
-            //wait to obtain the event, then lock anyone else out
+			//wait to obtain the event, then lock anyone else out
 			if(milliseconds != -1)
 			{
-                timeval tv;
-                gettimeofday(&tv, NULL);
-                
-                uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 
-                                        + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
-                
+				timeval tv;
+				gettimeofday(&tv, NULL);
+				
+				uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 
+                + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
+				
 				timespec ts;
 				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
 				ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
 				
 				result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
-                if(result == 0)
-                {
-                    //We've only accquired the event if the wait succeeded
-                    event->State = false;
-                }
+				if(result == 0)
+				{
+					//We've only accquired the event if the wait succeeded
+					event->State = false;
+				}
 			}
 			else
 			{
 				result = pthread_cond_wait(&event->CVariable, &event->Mutex);
-                if(result == 0)
-                {
-                    event->State = false;
-                }
+				if(result == 0)
+				{
+					event->State = false;
+				}
 			}
 		}
 		else if(event->AutoReset)
 		{
 			//It's an auto-reset event that's currently available;
 			//we need to stop anyone else from using it
-            result = 0;
+			result = 0;
 			event->State = false;
 		}
 		//Else we're trying to obtain a manual reset event with a signalled state;
-        //don't do anything
+		//don't do anything
 		
 		pthread_mutex_unlock(&event->Mutex);
 		
@@ -97,7 +97,7 @@ namespace neosmart
 		int result = pthread_cond_destroy(&event->CVariable);
 		if(result != 0)
 			return result;
-			
+        
 		result = pthread_mutex_destroy(&event->Mutex);
 		if(result != 0)
 			return result;
@@ -117,13 +117,13 @@ namespace neosmart
 		
 		//Depending on the event type, we either trigger everyone or only one
 		if(event->AutoReset)
-        {
+		{
 			result = pthread_cond_signal(&event->CVariable);
-        }
+		}
 		else
-        {
+		{
 			result = pthread_cond_broadcast(&event->CVariable);
-        }
+		}
 		
 		pthread_mutex_unlock(&event->Mutex);
 		
