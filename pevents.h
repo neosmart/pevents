@@ -16,7 +16,7 @@ namespace neosmart
 	struct neosmart_event_t_;
 	typedef neosmart_event_t_ * neosmart_event_t;
 	
-    //WIN32-style pevent functions
+    //WIN32-style functions
 	neosmart_event_t CreateEvent(bool manualReset = false, bool initialState = false);
 	int DestroyEvent(neosmart_event_t event);
 	int WaitForEvent(neosmart_event_t event, uint32_t milliseconds = -1);
