@@ -3,7 +3,7 @@ events for POSIX systems. pevents is built on pthreads and provides
 *most* of the functionality of both manual- and auto-reset events on
 Windows.
 
-pevents is developed and maintained by Mahmoud Al- Qudsi
+pevents is developed and maintained by Mahmoud Al-Qudsi
 <mqudsi@neosmart.net> of NeoSmart Technologies <http://neosmart.net/>
 
 While POSIX condition variables (pthread_cond_t) and WIN32 events both
