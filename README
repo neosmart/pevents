@@ -1,7 +1,8 @@
 pevents is a C++ library meant to provide an implementation of the WIN32
 events for POSIX systems. pevents is built on pthreads and provides
 *most* of the functionality of both manual- and auto-reset events on
-Windows.
+Windows, including simultaneous waits on multiple events (à la 
+WaitForMultipleObjects).
 
 pevents is developed and maintained by Mahmoud Al-Qudsi
 <mqudsi@neosmart.net> of NeoSmart Technologies <http://neosmart.net/>
@@ -35,7 +36,10 @@ WIN32-style pevents API:
 	
 	int DestroyEvent(neosmart_event_t event);
 	
-	int WaitForEvent(neosmart_event_t event, uint32_t milliseconds);
+	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds);
+	
+	int WaitForMultipleEvents(neosmart_event_t *events, int count, 
+		bool waitAll, uint64_t milliseconds, int &index);
 	
 	int SetEvent(neosmart_event_t event);
 	
