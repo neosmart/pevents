@@ -244,8 +244,10 @@ namespace neosmart
 		if(event->AutoReset)
 		{
 #ifdef WFMO
-			for(std::vector<neosmart_wfmo_info_t_>::reverse_iterator i = event->RegisteredWaits.rbegin(); i < event->RegisteredWaits.rend(); ++i)
+			bool skipCV = false;
+			while(!event->RegisteredWaits.empty())
 			{
+				neosmart_wfmo_info_t i = &event->RegisteredWaits.back();
 				pthread_mutex_lock(&i->Waiter->Mutex);
 				--i->Waiter->RefCount;
 				if(!i->Waiter->StillWaiting)
@@ -259,17 +261,20 @@ namespace neosmart
 					{
 						pthread_mutex_unlock(&i->Waiter->Mutex);
 					}
+					event->RegisteredWaits.pop_back();
 					continue;
 				}
 				
+				skipCV = true;
 				i->Waiter->EventStatus[i->WaitIndex] = true;
 				if(!i->Waiter->WaitAll)
 					i->Waiter->StillWaiting = false;
-				pthread_cond_signal(&i->Waiter->CVariable);
-				event->RegisteredWaits.erase((i+1).base(), (event->RegisteredWaits.rbegin()+1).base());
+				result = pthread_cond_signal(&i->Waiter->CVariable);
 				pthread_mutex_unlock(&i->Waiter->Mutex);
-				goto exit;
+				event->RegisteredWaits.pop_back();
+				break;
 			}
+			if(!skipCV)
 #endif
 			result = pthread_cond_signal(&event->CVariable);
 		}
@@ -303,7 +308,6 @@ namespace neosmart
 			result = pthread_cond_broadcast(&event->CVariable);
 		}
 		
-	exit:
 		pthread_mutex_unlock(&event->Mutex);
 		
 		return result;
