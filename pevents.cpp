@@ -110,9 +110,13 @@ namespace neosmart
 		
 		//Depending on the event type, we either trigger everyone or only one
 		if(event->AutoReset)
+        {
 			result = pthread_cond_signal(&event->CVariable);
+        }
 		else
+        {
 			result = pthread_cond_broadcast(&event->CVariable);
+        }
 		
 		pthread_mutex_unlock(&event->Mutex);
 		
