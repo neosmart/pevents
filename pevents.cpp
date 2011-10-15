@@ -293,6 +293,7 @@ namespace neosmart
 				}
 				
 				skipCV = true;
+				event->State = false;
 				i->Waiter->EventStatus[i->WaitIndex] = true;
 				if(!i->Waiter->WaitAll)
 					i->Waiter->StillWaiting = false;
