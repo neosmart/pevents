@@ -103,7 +103,7 @@ namespace neosmart
 				{
 					result = pthread_cond_wait(&event->CVariable, &event->Mutex);
 				}
-			} while(!event->State);
+			} while(result == 0 && !event->State);
 			
 			if(result == 0)
 			{
@@ -185,6 +185,7 @@ namespace neosmart
 			{
 				result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
 			}
+			
 			if(result != 0)
 				break;
 			
