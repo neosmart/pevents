@@ -177,19 +177,7 @@ namespace neosmart
 		bool done = false;
 		while(!done)
 		{
-			if(milliseconds != -1)
-			{
-				result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
-			}
-			else
-			{
-				result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
-			}
-			
-			if(result != 0)
-				break;
-			
-			//One (or more) of the events we're monitoring has been triggered
+			//One (or more) of the events we're monitoring has been triggered?
 			for(int i = 0; i < count; ++i)
 			{
 				if(!waitAll && wfmo->EventStatus[i])
@@ -202,6 +190,21 @@ namespace neosmart
 				{
 					break;
 				}
+			}
+			
+			if(!done)
+			{
+				if(milliseconds != -1)
+				{
+					result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
+				}
+				else
+				{
+					result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
+				}
+				
+				if(result != 0)
+					break;	
 			}
 		}
 
