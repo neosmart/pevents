@@ -196,11 +196,12 @@ namespace neosmart
 		{
 			//One (or more) of the events we're monitoring has been triggered?
 			
-			wfmo->StillWaiting = false;
+			wfmo->StillWaiting = !waitAll;
 			for(int i = 0; i < count; ++i)
 			{
 				if(!waitAll && wfmo->EventStatus[i])
 				{
+					wfmo->StillWaiting = false;
 					waitIndex = i;
 					break;
 				}
