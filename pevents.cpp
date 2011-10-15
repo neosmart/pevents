@@ -54,6 +54,10 @@ namespace neosmart
 	{
 		neosmart_event_t event = new neosmart_event_t_;
 		
+		pthread_mutexattr_t mutexattr;
+		pthread_mutexattr_init(&mutexattr);
+		pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_RECURSIVE);
+		
 		int result = pthread_cond_init(&event->CVariable, 0);
 		if(result != 0)
 			return NULL;
@@ -152,18 +156,31 @@ namespace neosmart
 		
 		for(int i = 0; i < count; ++i)
 		{
-			int result = pthread_mutex_lock(&events[i]->Mutex);
-			if(result != 0)
-				return result;
-			
 			waitInfo.WaitIndex++;
-			events[i]->RegisteredWaits.push_back(waitInfo);
 			
-			pthread_mutex_unlock(&events[i]->Mutex);
+			if(WaitForEvent(events[i], 0) == 0)
+			{
+				wfmo->EventStatus[i] = true;
+				if(!waitAll)
+				{
+					wfmo->StillWaiting = false;
+					break;
+				}
+			}
+			else
+			{
+				int result = pthread_mutex_lock(&events[i]->Mutex);
+				if(result != 0)
+					return result;
+				
+				events[i]->RegisteredWaits.push_back(waitInfo);
+				
+				pthread_mutex_unlock(&events[i]->Mutex);
+			}
 		}
 		
 		timespec ts;
-		if(milliseconds != -1)
+		if(wfmo->StillWaiting && milliseconds != -1)
 		{
 			timeval tv;
 			gettimeofday(&tv, NULL);
@@ -174,25 +191,26 @@ namespace neosmart
 			ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
 		}
 		
-		bool done = false;
-		while(!done)
+		while(wfmo->StillWaiting)
 		{
 			//One (or more) of the events we're monitoring has been triggered?
+			
+			wfmo->StillWaiting = false;
 			for(int i = 0; i < count; ++i)
 			{
 				if(!waitAll && wfmo->EventStatus[i])
 				{
-					done = true;
 					waitIndex = i;
 					break;
 				}
 				if(waitAll && !wfmo->EventStatus[i])
 				{
+					wfmo->StillWaiting = true;
 					break;
 				}
 			}
 			
-			if(!done)
+			if(wfmo->StillWaiting)
 			{
 				if(milliseconds != -1)
 				{
@@ -207,7 +225,7 @@ namespace neosmart
 					break;	
 			}
 		}
-
+		
 		--wfmo->RefCount;
 		if(wfmo->RefCount == 0)
 		{
