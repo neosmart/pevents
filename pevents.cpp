@@ -79,8 +79,7 @@ namespace neosmart
         
 		if(!event->State)
 		{	
-			//Regardless of whether it's an auto-reset or manual-reset event:
-			//wait to obtain the event, then lock anyone else out
+			timespec ts;
 			if(milliseconds != -1)
 			{
 				timeval tv;
@@ -88,24 +87,28 @@ namespace neosmart
 				
 				uint64_t nanoseconds = tv.tv_sec * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + tv.tv_usec * 1000;
 				
-				timespec ts;
 				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
 				ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
-				
-				result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
-				if(result == 0)
-				{
-					//We've only accquired the event if the wait succeeded
-					event->State = false;
-				}
 			}
-			else
+			
+			do
 			{
-				result = pthread_cond_wait(&event->CVariable, &event->Mutex);
-				if(result == 0)
+				//Regardless of whether it's an auto-reset or manual-reset event:
+				//wait to obtain the event, then lock anyone else out
+				if(milliseconds != -1)
 				{
-					event->State = false;
+					result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
 				}
+				else
+				{
+					result = pthread_cond_wait(&event->CVariable, &event->Mutex);
+				}
+			} while(!event->State);
+			
+			if(result == 0)
+			{
+				//We've only accquired the event if the wait succeeded
+				event->State = false;
 			}
 		}
 		else if(event->AutoReset)
@@ -186,17 +189,16 @@ namespace neosmart
 				break;
 			
 			//One (or more) of the events we're monitoring has been triggered
-			done = true;
 			for(int i = 0; i < count; ++i)
 			{
 				if(!waitAll && wfmo->EventStatus[i])
 				{
+					done = true;
 					waitIndex = i;
 					break;
 				}
 				if(waitAll && !wfmo->EventStatus[i])
 				{
-					done = false;
 					break;
 				}
 			}
