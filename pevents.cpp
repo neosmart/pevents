@@ -163,6 +163,7 @@ namespace neosmart
 				wfmo->EventStatus[i] = true;
 				if(!waitAll)
 				{
+					waitIndex = i;
 					wfmo->StillWaiting = false;
 					break;
 				}
