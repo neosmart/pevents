@@ -149,7 +149,7 @@ namespace neosmart
 		
 		wfmo->WaitAll = waitAll;
 		wfmo->StillWaiting = true;
-		wfmo->RefCount = count + 1;
+		wfmo->RefCount = 1;
 		wfmo->EventStatus.resize(count, false);
 		
 		pthread_mutex_lock(&wfmo->Mutex);
@@ -175,6 +175,7 @@ namespace neosmart
 					return result;
 				
 				events[i]->RegisteredWaits.push_back(waitInfo);
+				++wfmo->RefCount;
 				
 				pthread_mutex_unlock(&events[i]->Mutex);
 			}
