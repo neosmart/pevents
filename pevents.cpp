@@ -6,6 +6,7 @@
  */
 
 #include "pevents.h"
+#include <assert.h>
 #include <sys/time.h>
 #ifdef WFMO
 #include <vector>
@@ -154,9 +155,12 @@ namespace neosmart
 		
 		pthread_mutex_lock(&wfmo->Mutex);
 		
+		bool done = false;
+		waitIndex = -1;
+		
 		for(int i = 0; i < count; ++i)
 		{
-			waitInfo.WaitIndex++;
+			waitInfo.WaitIndex = i;
 			
 			if(WaitForEvent(events[i], 0) == 0)
 			{
@@ -164,7 +168,7 @@ namespace neosmart
 				if(!waitAll)
 				{
 					waitIndex = i;
-					wfmo->StillWaiting = false;
+					done = true;
 					break;
 				}
 			}
@@ -182,7 +186,7 @@ namespace neosmart
 		}
 		
 		timespec ts;
-		if(wfmo->StillWaiting && milliseconds != -1)
+		if(!done && milliseconds != -1)
 		{
 			timeval tv;
 			gettimeofday(&tv, NULL);
@@ -193,27 +197,27 @@ namespace neosmart
 			ts.tv_nsec = (nanoseconds - ts.tv_sec * 1000 * 1000 * 1000);
 		}
 		
-		while(wfmo->StillWaiting)
+		while(!done)
 		{
 			//One (or more) of the events we're monitoring has been triggered?
 			
-			wfmo->StillWaiting = !waitAll;
+			done = waitAll;
 			for(int i = 0; i < count; ++i)
 			{
 				if(!waitAll && wfmo->EventStatus[i])
 				{
-					wfmo->StillWaiting = false;
+					done = true;
 					waitIndex = i;
 					break;
 				}
 				if(waitAll && !wfmo->EventStatus[i])
 				{
-					wfmo->StillWaiting = true;
+					done = false;
 					break;
 				}
 			}
 			
-			if(wfmo->StillWaiting)
+			if(!done)
 			{
 				if(milliseconds != -1)
 				{
@@ -225,9 +229,11 @@ namespace neosmart
 				}
 				
 				if(result != 0)
-					break;	
+					break;
 			}
 		}
+		
+		wfmo->StillWaiting = false;
 		
 		--wfmo->RefCount;
 		if(wfmo->RefCount == 0)
