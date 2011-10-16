@@ -201,6 +201,8 @@ namespace neosmart
 		{
 			//One (or more) of the events we're monitoring has been triggered?
 			
+			//If we're waiting for all events, assume we're done and check if there's an event that hasn't fired
+			//But if we're waiting for just one event, assume we're not done until we find a fired event
 			done = waitAll;
 			for(int i = 0; i < count; ++i)
 			{
