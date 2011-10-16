@@ -279,7 +279,6 @@ namespace neosmart
 		if(event->AutoReset)
 		{
 #ifdef WFMO
-			bool skipCV = false;
 			while(!event->RegisteredWaits.empty())
 			{
 				neosmart_wfmo_info_t i = &event->RegisteredWaits.back();
@@ -300,7 +299,6 @@ namespace neosmart
 					continue;
 				}
 				
-				skipCV = true;
 				event->State = false;
 				i->Waiter->EventStatus[i->WaitIndex] = true;
 				if(!i->Waiter->WaitAll)
@@ -310,9 +308,12 @@ namespace neosmart
 				event->RegisteredWaits.pop_back();
 				break;
 			}
-			if(!skipCV)
 #endif
-			result = pthread_cond_signal(&event->CVariable);
+			//event->State can be false if compiled with WFMO support
+			if(event->State)
+			{
+				result = pthread_cond_signal(&event->CVariable);
+			}
 		}
 		else
 		{
