@@ -110,7 +110,7 @@ namespace neosmart
 				}
 			} while(result == 0 && !event->State);
 			
-			if(result == 0)
+			if(result == 0 && event->AutoReset)
 			{
 				//We've only accquired the event if the wait succeeded
 				event->State = false;
