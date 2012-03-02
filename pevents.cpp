@@ -55,10 +55,6 @@ namespace neosmart
 	{
 		neosmart_event_t event = new neosmart_event_t_;
 		
-		pthread_mutexattr_t mutexattr;
-		pthread_mutexattr_init(&mutexattr);
-		pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_RECURSIVE);
-		
 		int result = pthread_cond_init(&event->CVariable, 0);
 		if(result != 0)
 			return NULL;
