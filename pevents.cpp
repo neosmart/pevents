@@ -7,6 +7,7 @@
 
 #include "pevents.h"
 #include <assert.h>
+#include <errno.h>
 #include <sys/time.h>
 #ifdef WFMO
 #include <vector>
@@ -77,6 +78,12 @@ namespace neosmart
 		int result = 0;
 		if(!event->State)
 		{	
+			//Zero-timeout event state check optimization
+			if(milliseconds == 0)
+			{
+				return ETIMEDOUT;
+			}
+			
 			timespec ts;
 			if(milliseconds != -1)
 			{
