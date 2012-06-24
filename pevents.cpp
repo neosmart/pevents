@@ -72,12 +72,9 @@ namespace neosmart
 		return event;
 	}
 	
-	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
+	int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
-		int result = pthread_mutex_lock(&event->Mutex);
-		if(result != 0)
-			return result;
-        
+		int result = 0;
 		if(!event->State)
 		{	
 			timespec ts;
@@ -122,6 +119,17 @@ namespace neosmart
 		//Else we're trying to obtain a manual reset event with a signalled state;
 		//don't do anything
 		
+		return result;
+	}
+	
+	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
+	{
+		int result = pthread_mutex_lock(&event->Mutex);
+		if(result != 0)
+			return result;
+        
+		result = UnlockedWaitForEvent(event, milliseconds);
+		
 		pthread_mutex_unlock(&event->Mutex);
 		
 		return result;
@@ -158,8 +166,15 @@ namespace neosmart
 		{
 			waitInfo.WaitIndex = i;
 			
-			if(WaitForEvent(events[i], 0) == 0)
+			//Must not release lock until RegisteredWait is potentially added
+			int result = pthread_mutex_lock(&events[i]->Mutex);
+			if(result != 0)
+				return result;
+			
+			if(UnlockedWaitForEvent(events[i], 0) == 0)
 			{
+				pthread_mutex_unlock(&events[i]->Mutex);
+				
 				wfmo->EventStatus[i] = true;
 				if(!waitAll)
 				{
@@ -169,11 +184,7 @@ namespace neosmart
 				}
 			}
 			else
-			{
-				int result = pthread_mutex_lock(&events[i]->Mutex);
-				if(result != 0)
-					return result;
-				
+			{				
 				events[i]->RegisteredWaits.push_back(waitInfo);
 				++wfmo->RefCount;
 				
