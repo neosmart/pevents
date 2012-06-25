@@ -200,15 +200,23 @@ namespace neosmart
 		}
 		
 		timespec ts;
-		if(!done && milliseconds != -1)
+		if(!done)
 		{
-			timeval tv;
-			gettimeofday(&tv, NULL);
-			
-			uint64_t nanoseconds = ((uint64_t) tv.tv_sec) * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + ((uint64_t) tv.tv_usec) * 1000;
-			
-			ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
-			ts.tv_nsec = (nanoseconds - ((uint64_t) ts.tv_sec) * 1000 * 1000 * 1000);
+			if(milliseconds == 0)
+			{
+				result = ETIMEDOUT;
+				done = true;
+			}
+			else if(milliseconds != -1)
+			{
+				timeval tv;
+				gettimeofday(&tv, NULL);
+				
+				uint64_t nanoseconds = ((uint64_t) tv.tv_sec) * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + ((uint64_t) tv.tv_usec) * 1000;
+				
+				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
+				ts.tv_nsec = (nanoseconds - ((uint64_t) ts.tv_sec) * 1000 * 1000 * 1000);
+			}
 		}
 		
 		while(!done)
