@@ -85,7 +85,7 @@ namespace neosmart
 			}
 			
 			timespec ts;
-			if(milliseconds != -1)
+			if(milliseconds != (uint64_t) -1)
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
@@ -100,7 +100,7 @@ namespace neosmart
 			{
 				//Regardless of whether it's an auto-reset or manual-reset event:
 				//wait to obtain the event, then lock anyone else out
-				if(milliseconds != -1)
+				if(milliseconds != (uint64_t) -1)
 				{
 					result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
 				}
@@ -207,7 +207,7 @@ namespace neosmart
 				result = ETIMEDOUT;
 				done = true;
 			}
-			else if(milliseconds != -1)
+			else if(milliseconds != (uint64_t) -1)
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
@@ -243,7 +243,7 @@ namespace neosmart
 			
 			if(!done)
 			{
-				if(milliseconds != -1)
+				if(milliseconds != (uint64_t) -1)
 				{
 					result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
 				}
@@ -340,7 +340,7 @@ namespace neosmart
 		else
 		{
 #ifdef WFMO
-			for(int i = 0; i < event->RegisteredWaits.size(); ++i)
+			for(size_t i = 0; i < event->RegisteredWaits.size(); ++i)
 			{
 				neosmart_wfmo_info_t info = &event->RegisteredWaits[i];
 				pthread_mutex_lock(&info->Waiter->Mutex);
