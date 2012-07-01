@@ -39,6 +39,9 @@ WIN32-style pevents API:
 	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds);
 	
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, 
+		bool waitAll, uint64_t milliseconds);
+	
+	int WaitForMultipleEvents(neosmart_event_t *events, int count, 
 		bool waitAll, uint64_t milliseconds, int &index);
 	
 	int SetEvent(neosmart_event_t event);

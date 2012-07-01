@@ -143,6 +143,12 @@ namespace neosmart
 	}
 	
 #ifdef WFMO
+	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds)
+	{
+		int unused;
+		return WaitForMultipleEvents(events, count, waitAll, milliseconds, unused);
+	}
+	
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &waitIndex)
 	{
 		neosmart_wfmo_t wfmo = new neosmart_wfmo_t_;
