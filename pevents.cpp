@@ -155,11 +155,17 @@ namespace neosmart
 		
 		int result = pthread_mutex_init(&wfmo->Mutex, 0);
 		if(result != 0)
+		{
+			delete wfmo;
 			return result;
+		}
 		
 		result = pthread_cond_init(&wfmo->CVariable, 0);
 		if(result != 0)
+		{
+			delete wfmo;
 			return result;
+		}
 		
 		neosmart_wfmo_info_t_ waitInfo;
 		waitInfo.Waiter = wfmo;
@@ -182,11 +188,19 @@ namespace neosmart
 			//Must not release lock until RegisteredWait is potentially added
 			int result = pthread_mutex_lock(&events[i]->Mutex);
 			if(result != 0)
+			{
+				delete wfmo;
 				return result;
+			}
 			
 			if(UnlockedWaitForEvent(events[i], 0) == 0)
 			{
-				pthread_mutex_unlock(&events[i]->Mutex);
+				result = pthread_mutex_unlock(&events[i]->Mutex);
+				if(result != 0)
+				{
+					delete wfmo;
+					return result;
+				}
 				
 				wfmo->EventStatus[i] = true;
 				if(!waitAll)
