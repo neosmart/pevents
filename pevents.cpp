@@ -69,7 +69,10 @@ namespace neosmart
 		event->AutoReset = !manualReset;
 		
 		if(initialState && SetEvent(event) != 0)
+		{
+			assert(false);
 			return NULL; //Shouldn't ever happen
+		}
 		
 		return event;
 	}
@@ -134,11 +137,19 @@ namespace neosmart
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
 		if(result != 0)
+		{
 			return result;
+		}
         
 		result = UnlockedWaitForEvent(event, milliseconds);
 		
-		pthread_mutex_unlock(&event->Mutex);
+		int tempResult = pthread_mutex_unlock(&event->Mutex);
+		if (tempResult != 0)
+		{
+			//Inconsistent state. Cannot continue after this.
+			assert(false);
+			return tempResult;
+		}
 		
 		return result;
 	}
@@ -164,6 +175,7 @@ namespace neosmart
 		result = pthread_cond_init(&wfmo->CVariable, 0);
 		if(result != 0)
 		{
+			pthread_mutex_destroy(&wfmo->Mutex);
 			delete wfmo;
 			return result;
 		}
@@ -177,7 +189,13 @@ namespace neosmart
 		wfmo->RefCount = 1;
 		wfmo->EventStatus.resize(count, false);
 		
-		pthread_mutex_lock(&wfmo->Mutex);
+		result = pthread_mutex_lock(&wfmo->Mutex);
+		if (result != 0)
+		{
+			wfmo->Destroy();
+			delete wfmo;
+			return result;
+		}
 		
 		bool done = false;
 		waitIndex = -1;
@@ -187,10 +205,11 @@ namespace neosmart
 			waitInfo.WaitIndex = i;
 			
 			//Must not release lock until RegisteredWait is potentially added
-			int result = pthread_mutex_lock(&events[i]->Mutex);
+			result = pthread_mutex_lock(&events[i]->Mutex);
 			if(result != 0)
 			{
-				delete wfmo;
+				//Inconsistent state. Cannot continue after this.
+				assert(false);
 				return result;
 			}
 			
@@ -199,7 +218,8 @@ namespace neosmart
 				result = pthread_mutex_unlock(&events[i]->Mutex);
 				if(result != 0)
 				{
-					delete wfmo;
+					//Inconsistent state. Cannot continue after this.
+					assert(false);
 					return result;
 				}
 				
@@ -216,7 +236,13 @@ namespace neosmart
 				events[i]->RegisteredWaits.push_back(waitInfo);
 				++wfmo->RefCount;
 				
-				pthread_mutex_unlock(&events[i]->Mutex);
+				int tempResult = pthread_mutex_unlock(&events[i]->Mutex);
+				if(tempResult != 0)
+				{
+					//Inconsistent state. Cannot continue after this.
+					assert(false);
+					return tempResult;
+				}
 			}
 		}
 		
@@ -288,7 +314,13 @@ namespace neosmart
 		}
 		else
 		{
-			pthread_mutex_unlock(&wfmo->Mutex);
+			int tempResult = pthread_mutex_unlock(&wfmo->Mutex);
+			if (tempResult != 0)
+			{
+				//Inconsistent state. Cannot continue after this.
+				assert(false);
+				return tempResult;
+			}
 		}
 		
 		return result;
@@ -357,7 +389,13 @@ namespace neosmart
 			//event->State can be false if compiled with WFMO support
 			if(event->State)
 			{
-				pthread_mutex_unlock(&event->Mutex);
+				int tempResult = pthread_mutex_unlock(&event->Mutex);
+				if (tempResult != 0)
+				{
+					//Inconsistent state. Cannot continue after this.
+					assert(false);
+					return tempResult;
+				}
 				result = pthread_cond_signal(&event->CVariable);
 				
 				return result;
@@ -369,7 +407,13 @@ namespace neosmart
 			for(size_t i = 0; i < event->RegisteredWaits.size(); ++i)
 			{
 				neosmart_wfmo_info_t info = &event->RegisteredWaits[i];
-				pthread_mutex_lock(&info->Waiter->Mutex);
+				int tempResult = pthread_mutex_lock(&info->Waiter->Mutex);
+				if (tempResult != 0)
+				{
+					//Inconsistent state. Cannot continue after this.
+					assert(false);
+					return tempResult;
+				}
 				--info->Waiter->RefCount;
 				if(!info->Waiter->StillWaiting)
 				{
@@ -380,7 +424,13 @@ namespace neosmart
 					}
 					else
 					{
-						pthread_mutex_unlock(&info->Waiter->Mutex);
+						tempResult = pthread_mutex_unlock(&info->Waiter->Mutex);
+						if (tempResult != 0)
+						{
+							//Inconsistent state. Cannot continue after this.
+							assert(false);
+							return tempResult;
+						}
 					}
 					continue;
 				}
@@ -392,7 +442,13 @@ namespace neosmart
 			}
 			event->RegisteredWaits.clear();
 #endif
-			pthread_mutex_unlock(&event->Mutex);
+			int tempResult = pthread_mutex_unlock(&event->Mutex);
+			if (tempResult != 0)
+			{
+				//Inconsistent state. Cannot continue after this.
+				assert(false);
+				return tempResult;
+			}
 			result = pthread_cond_broadcast(&event->CVariable);
 		}
 		
@@ -407,7 +463,13 @@ namespace neosmart
 		
 		event->State = false;
 		
-		pthread_mutex_unlock(&event->Mutex);
+		int tempResult = pthread_mutex_unlock(&event->Mutex);
+		if (tempResult != 0)
+		{
+			//Inconsistent state. Cannot continue after this.
+			assert(false);
+			return tempResult;
+		}
 		
 		return result;
 	}
