@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #ifdef WFMO
 #include <vector>
+#include <deque>
 #endif
 
 namespace neosmart
@@ -48,7 +49,7 @@ namespace neosmart
 		pthread_mutex_t Mutex;
 		bool State;
 #ifdef WFMO
-		std::vector<neosmart_wfmo_info_t_> RegisteredWaits;
+		std::deque<neosmart_wfmo_info_t_> RegisteredWaits;
 #endif
 	};
 	
@@ -323,7 +324,7 @@ namespace neosmart
 #ifdef WFMO
 			while(!event->RegisteredWaits.empty())
 			{
-				neosmart_wfmo_info_t i = &event->RegisteredWaits.back();
+				neosmart_wfmo_info_t i = &event->RegisteredWaits.front();
 				pthread_mutex_lock(&i->Waiter->Mutex);
 				--i->Waiter->RefCount;
 				if(!i->Waiter->StillWaiting)
@@ -337,7 +338,7 @@ namespace neosmart
 					{
 						pthread_mutex_unlock(&i->Waiter->Mutex);
 					}
-					event->RegisteredWaits.pop_back();
+					event->RegisteredWaits.pop_front();
 					continue;
 				}
 				
@@ -347,7 +348,7 @@ namespace neosmart
 					i->Waiter->StillWaiting = false;
 				result = pthread_cond_signal(&i->Waiter->CVariable);
 				pthread_mutex_unlock(&i->Waiter->Mutex);
-				event->RegisteredWaits.pop_back();
+				event->RegisteredWaits.pop_front();
 				break;
 			}
 #endif
