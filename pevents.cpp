@@ -21,7 +21,11 @@ namespace neosmart
 	{
 		pthread_mutex_t Mutex;
 		pthread_cond_t CVariable;
-		std::vector<bool> EventStatus;
+		union
+		{
+			int FiredEvent; //WFSO
+			int EventsLeft; //WFMO
+		} Status;
 		bool StillWaiting;
 		int RefCount;
 		bool WaitAll;
@@ -187,7 +191,15 @@ namespace neosmart
 		wfmo->WaitAll = waitAll;
 		wfmo->StillWaiting = true;
 		wfmo->RefCount = 1;
-		wfmo->EventStatus.resize(count, false);
+		
+		if(waitAll)
+		{
+			wfmo->Status.EventsLeft = count;
+		}
+		else
+		{
+			wfmo->Status.FiredEvent = -1;
+		}
 		
 		result = pthread_mutex_lock(&wfmo->Mutex);
 		if (result != 0)
@@ -223,9 +235,14 @@ namespace neosmart
 					return result;
 				}
 				
-				wfmo->EventStatus[i] = true;
-				if(!waitAll)
+				if(waitAll)
 				{
+					--wfmo->Status.EventsLeft;
+					assert(wfmo->Status.EventsLeft >= 0);
+				}
+				else
+				{
+					wfmo->Status.FiredEvent = i;
 					waitIndex = i;
 					done = true;
 					break;
@@ -272,21 +289,7 @@ namespace neosmart
 			
 			//If we're waiting for all events, assume we're done and check if there's an event that hasn't fired
 			//But if we're waiting for just one event, assume we're not done until we find a fired event
-			done = waitAll;
-			for(int i = 0; i < count; ++i)
-			{
-				if(!waitAll && wfmo->EventStatus[i])
-				{
-					done = true;
-					waitIndex = i;
-					break;
-				}
-				if(waitAll && !wfmo->EventStatus[i])
-				{
-					done = false;
-					break;
-				}
-			}
+			done = (waitAll && wfmo->Status.EventsLeft == 0) || (!waitAll && wfmo->Status.FiredEvent != -1);
 			
 			if(!done)
 			{
@@ -304,6 +307,7 @@ namespace neosmart
 			}
 		}
 		
+		waitIndex = wfmo->Status.FiredEvent;
 		wfmo->StillWaiting = false;
 		
 		--wfmo->RefCount;
@@ -375,9 +379,21 @@ namespace neosmart
 				}
 				
 				event->State = false;
-				i->Waiter->EventStatus[i->WaitIndex] = true;
-				if(!i->Waiter->WaitAll)
+				
+				if(i->Waiter->WaitAll)
+				{
+					--i->Waiter->Status.EventsLeft;
+					assert(i->Waiter->Status.EventsLeft >= 0);
+					//We technically should do i->Waiter->StillWaiting = Waiter->Statuts.EventsLeft != 0
+					//but the only time it'll be equal to zero is if we're the last event, so no one
+					//else will be checking the StillWaiting flag. We're good to go without it.
+				}
+				else
+				{
+					i->Waiter->Status.FiredEvent = i->WaitIndex;
 					i->Waiter->StillWaiting = false;
+				}
+				
 				pthread_mutex_unlock(&i->Waiter->Mutex);
 				result = pthread_cond_signal(&i->Waiter->CVariable);
 				event->RegisteredWaits.pop_front();
@@ -434,9 +450,21 @@ namespace neosmart
 					}
 					continue;
 				}
-				info->Waiter->EventStatus[info->WaitIndex] = true;
-				if(!info->Waiter->WaitAll)
+				
+				if(info->Waiter->WaitAll)
+				{
+					--info->Waiter->Status.EventsLeft;
+					assert(info->Waiter->Status.EventsLeft >= 0);
+					//We technically should do i->Waiter->StillWaiting = Waiter->Statuts.EventsLeft != 0
+					//but the only time it'll be equal to zero is if we're the last event, so no one
+					//else will be checking the StillWaiting flag. We're good to go without it.
+				}
+				else
+				{
+					info->Waiter->Status.FiredEvent = info->WaitIndex;
 					info->Waiter->StillWaiting = false;
+				}
+				
 				pthread_mutex_unlock(&info->Waiter->Mutex);
 				pthread_cond_signal(&info->Waiter->CVariable);
 			}
