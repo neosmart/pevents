@@ -384,7 +384,7 @@ namespace neosmart
 				{
 					--i->Waiter->Status.EventsLeft;
 					assert(i->Waiter->Status.EventsLeft >= 0);
-					//We technically should do i->Waiter->StillWaiting = Waiter->Statuts.EventsLeft != 0
+					//We technically should do i->Waiter->StillWaiting = Waiter->Status.EventsLeft != 0
 					//but the only time it'll be equal to zero is if we're the last event, so no one
 					//else will be checking the StillWaiting flag. We're good to go without it.
 				}
@@ -455,7 +455,7 @@ namespace neosmart
 				{
 					--info->Waiter->Status.EventsLeft;
 					assert(info->Waiter->Status.EventsLeft >= 0);
-					//We technically should do i->Waiter->StillWaiting = Waiter->Statuts.EventsLeft != 0
+					//We technically should do i->Waiter->StillWaiting = Waiter->Status.EventsLeft != 0
 					//but the only time it'll be equal to zero is if we're the last event, so no one
 					//else will be checking the StillWaiting flag. We're good to go without it.
 				}
