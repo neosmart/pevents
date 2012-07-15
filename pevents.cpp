@@ -385,6 +385,8 @@ namespace neosmart
 					continue;
 				}
 				info->Waiter->EventStatus[info->WaitIndex] = true;
+				if(!info->Waiter->WaitAll)
+					info->Waiter->StillWaiting = false;
 				pthread_mutex_unlock(&info->Waiter->Mutex);
 				pthread_cond_signal(&info->Waiter->CVariable);
 			}
