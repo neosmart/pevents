@@ -346,16 +346,21 @@ namespace neosmart
 				i->Waiter->EventStatus[i->WaitIndex] = true;
 				if(!i->Waiter->WaitAll)
 					i->Waiter->StillWaiting = false;
-				result = pthread_cond_signal(&i->Waiter->CVariable);
 				pthread_mutex_unlock(&i->Waiter->Mutex);
+				result = pthread_cond_signal(&i->Waiter->CVariable);
 				event->RegisteredWaits.pop_front();
-				break;
+				pthread_mutex_unlock(&event->Mutex);
+				
+				return result;
 			}
 #endif
 			//event->State can be false if compiled with WFMO support
 			if(event->State)
 			{
+				pthread_mutex_unlock(&event->Mutex);
 				result = pthread_cond_signal(&event->CVariable);
+				
+				return result;
 			}
 		}
 		else
@@ -380,15 +385,14 @@ namespace neosmart
 					continue;
 				}
 				info->Waiter->EventStatus[info->WaitIndex] = true;
-				pthread_cond_signal(&info->Waiter->CVariable);
 				pthread_mutex_unlock(&info->Waiter->Mutex);
+				pthread_cond_signal(&info->Waiter->CVariable);
 			}
 			event->RegisteredWaits.clear();
 #endif
+			pthread_mutex_unlock(&event->Mutex);
 			result = pthread_cond_broadcast(&event->CVariable);
 		}
-		
-		pthread_mutex_unlock(&event->Mutex);
 		
 		return result;
 	}
