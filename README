@@ -55,3 +55,22 @@ POSIX-style pevents API:
 All the code is contained within pevents.cpp and pevents.h. You should
 include these two files in your project as needed. All functions are in
 the neosmart namespace.
+
+Compilation options:
+
+The following preprocessor definitions may be defined (-DOPTION) at 
+compile time to enable different features.
+
+WFMO: Enables WFMO support in pevents. It is recommended to only compile
+with WFMO support if you are taking advantage of the 
+WaitForMultipleEvents function, as it adds a (small) overhead to all 
+event objects.
+
+PTHREADCHK: Enables error checking on the results of the platform's 
+pthread functions. If you do not anticipate your code will run at or 
+near the limits of system resources (memory, kernel objects) you can 
+safely compile without this option. It should be left enabled for debug
+builds. Note that code currently generates warnings about unused 
+variables if compiled without this flag with -Wall. Keeping this option
+undefined will result in slightly better-performing coding as it 
+eliminates a number of branches from the resulting assembly.
