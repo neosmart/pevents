@@ -10,21 +10,6 @@
 #include <pthread.h>
 #include <stdint.h>
 
-/* Compile-time options:
- 
-   #define WFMO
- 
- * Define WFMO to enable WFMO support (recommended to leave disabled if not using WFMO)
- * Compiling with WFMO support will add some overhead to all event objects
- 
-   #define PTHREADCHK
- 
- * Define PTHTREADCHK to enable error checking results of underlying pthread functions
- * Generally speaking, if you do not anticpate you will reach the platform's memory and resource limitations,
- * it is OK to disable pthread error checking, giving slightly better performance
- 
- */
-
 namespace neosmart
 {
 	//Type declarations
