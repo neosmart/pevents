@@ -75,14 +75,17 @@ namespace neosmart
 		event->State = false;
 		event->AutoReset = !manualReset;
 		
-		result = SetEvent(event);
-#ifdef PTHREADCHK
-		if(initialState && (result != 0))
+		if(initialState)
 		{
-			assert(false);
-			return NULL; //Shouldn't ever happen
-		}
+			result = SetEvent(event);
+#ifdef PTHREADCHK
+			if(result != 0)
+			{
+				assert(false);
+				return NULL; //Shouldn't ever happen
+			}
 #endif
+		}
 		
 		return event;
 	}
