@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <sys/time.h>
 #ifdef WFMO
-#include <vector>
 #include <deque>
 #endif
 
