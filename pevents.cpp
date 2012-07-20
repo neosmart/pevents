@@ -172,7 +172,20 @@ namespace neosmart
 
 	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
-		int tempResult = pthread_mutex_lock(&event->Mutex);
+		int tempResult;
+		if (milliseconds == 0)
+		{
+			tempResult = pthread_mutex_trylock(&event->Mutex);
+			if(tempResult == EBUSY)
+			{
+				return ETIMEDOUT;
+			}
+		}
+		else
+		{
+			tempResult = pthread_mutex_lock(&event->Mutex);
+		}
+
 		assert(tempResult == 0);
 
 		int result = UnlockedWaitForEvent(event, milliseconds);
