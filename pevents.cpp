@@ -57,6 +57,7 @@ namespace neosmart
 #endif
 	};
 
+#ifdef WFMO
 	bool RemoveExpiredWaitHelper(neosmart_wfmo_info_t_ wait)
 	{
 		int result = pthread_mutex_trylock(&wait.Waiter->Mutex);
@@ -91,6 +92,7 @@ namespace neosmart
 
 		return false;
 	}
+#endif
 
 	neosmart_event_t CreateEvent(bool manualReset, bool initialState)
 	{
