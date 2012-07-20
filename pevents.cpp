@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #ifdef WFMO
+#include <algorithm>
 #include <deque>
 #endif
 
@@ -28,7 +29,7 @@ namespace neosmart
 		bool StillWaiting;
 		int RefCount;
 		bool WaitAll;
-		
+
 		void Destroy()
 		{
 			pthread_mutex_destroy(&Mutex);
@@ -36,7 +37,7 @@ namespace neosmart
 		}
 	};
 	typedef neosmart_wfmo_t_ *neosmart_wfmo_t;
-	
+
 	struct neosmart_wfmo_info_t_
 	{
 		neosmart_wfmo_t Waiter;
@@ -44,7 +45,7 @@ namespace neosmart
 	};
 	typedef neosmart_wfmo_info_t_ *neosmart_wfmo_info_t;
 #endif
-	
+
 	struct neosmart_event_t_
 	{
 		bool AutoReset;
@@ -55,26 +56,76 @@ namespace neosmart
 		std::deque<neosmart_wfmo_info_t_> RegisteredWaits;
 #endif
 	};
-	
+
+	bool RemoveExpiredWaitHelper(neosmart_wfmo_info_t_ wait)
+	{
+		int result = pthread_mutex_trylock(&wait.Waiter->Mutex);
+
+		if(result == EBUSY)
+		{
+			return false;
+		}
+#ifdef PTHREADCHK
+		else if(result != 0)
+		{
+			//Inconsistent state. Cannot continue after this.
+			printf("ERROR: %d: %s\n", result, strerror(result));
+			assert(false);
+		}
+#endif
+		if(wait.Waiter->StillWaiting == false)
+		{
+			--wait.Waiter->RefCount;
+			if(wait.Waiter->RefCount == 0)
+			{
+				wait.Waiter->Destroy();
+				delete wait.Waiter;
+			}
+			else
+			{
+				result = pthread_mutex_unlock(&wait.Waiter->Mutex);
+#ifdef PTHREADCHK
+				if(result != 0)
+				{
+					//Inconsistent state. Cannot continue after this.
+					assert(false);
+				}
+#endif
+			}
+			return true;
+		}
+
+		result = pthread_mutex_unlock(&wait.Waiter->Mutex);
+#ifdef PTHREADCHK
+		if(result != 0)
+		{
+			//Inconsistent state. Cannot continue after this.
+			assert(false);
+		}
+#endif
+
+		return false;
+	}
+
 	neosmart_event_t CreateEvent(bool manualReset, bool initialState)
 	{
 		neosmart_event_t event = new neosmart_event_t_;
-		
+
 		int result = pthread_cond_init(&event->CVariable, 0);
 #ifdef PTHREADCHK
 		if(result != 0)
 			return NULL;
 #endif
-		
+
 		result = pthread_mutex_init(&event->Mutex, 0);
 #ifdef PTHREADCHK
 		if(result != 0)
 			return NULL;
 #endif
-		
+
 		event->State = false;
 		event->AutoReset = !manualReset;
-		
+
 		if(initialState)
 		{
 			result = SetEvent(event);
@@ -86,33 +137,33 @@ namespace neosmart
 			}
 #endif
 		}
-		
+
 		return event;
 	}
-	
+
 	int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
 		int result = 0;
 		if(!event->State)
-		{	
+		{
 			//Zero-timeout event state check optimization
 			if(milliseconds == 0)
 			{
 				return ETIMEDOUT;
 			}
-			
+
 			timespec ts;
 			if(milliseconds != (uint64_t) -1)
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
-				
+
 				uint64_t nanoseconds = ((uint64_t) tv.tv_sec) * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + ((uint64_t) tv.tv_usec) * 1000;
-				
+
 				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
 				ts.tv_nsec = (nanoseconds - ((uint64_t) ts.tv_sec) * 1000 * 1000 * 1000);
 			}
-			
+
 			do
 			{
 				//Regardless of whether it's an auto-reset or manual-reset event:
@@ -126,7 +177,7 @@ namespace neosmart
 					result = pthread_cond_wait(&event->CVariable, &event->Mutex);
 				}
 			} while(result == 0 && !event->State);
-			
+
 			if(result == 0 && event->AutoReset)
 			{
 				//We've only accquired the event if the wait succeeded
@@ -142,10 +193,10 @@ namespace neosmart
 		}
 		//Else we're trying to obtain a manual reset event with a signalled state;
 		//don't do anything
-		
+
 		return result;
 	}
-	
+
 	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
@@ -155,9 +206,9 @@ namespace neosmart
 			return result;
 		}
 #endif
-        
+
 		result = UnlockedWaitForEvent(event, milliseconds);
-		
+
 		int tempResult = pthread_mutex_unlock(&event->Mutex);
 #ifdef PTHREADCHK
 		if (tempResult != 0)
@@ -167,21 +218,21 @@ namespace neosmart
 			return tempResult;
 		}
 #endif
-		
+
 		return result;
 	}
-	
+
 #ifdef WFMO
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds)
 	{
 		int unused;
 		return WaitForMultipleEvents(events, count, waitAll, milliseconds, unused);
 	}
-	
+
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &waitIndex)
 	{
 		neosmart_wfmo_t wfmo = new neosmart_wfmo_t_;
-		
+
 		int result = pthread_mutex_init(&wfmo->Mutex, 0);
 #ifdef PTHREADCHK
 		if(result != 0)
@@ -190,7 +241,7 @@ namespace neosmart
 			return result;
 		}
 #endif
-		
+
 		result = pthread_cond_init(&wfmo->CVariable, 0);
 #ifdef PTHREADCHK
 		if(result != 0)
@@ -200,15 +251,15 @@ namespace neosmart
 			return result;
 		}
 #endif
-		
+
 		neosmart_wfmo_info_t_ waitInfo;
 		waitInfo.Waiter = wfmo;
 		waitInfo.WaitIndex = -1;
-		
+
 		wfmo->WaitAll = waitAll;
 		wfmo->StillWaiting = true;
 		wfmo->RefCount = 1;
-		
+
 		if(waitAll)
 		{
 			wfmo->Status.EventsLeft = count;
@@ -217,7 +268,7 @@ namespace neosmart
 		{
 			wfmo->Status.FiredEvent = -1;
 		}
-		
+
 		result = pthread_mutex_lock(&wfmo->Mutex);
 #ifdef PTHREADCHK
 		if (result != 0)
@@ -227,14 +278,14 @@ namespace neosmart
 			return result;
 		}
 #endif
-		
+
 		bool done = false;
 		waitIndex = -1;
-		
+
 		for(int i = 0; i < count; ++i)
 		{
 			waitInfo.WaitIndex = i;
-			
+
 			//Must not release lock until RegisteredWait is potentially added
 			result = pthread_mutex_lock(&events[i]->Mutex);
 #ifdef PTHREADCHK
@@ -245,7 +296,9 @@ namespace neosmart
 				return result;
 			}
 #endif
-			
+			//Before adding this wait to the list of registered waits, let's clean up old, expired waits while we have the event lock anyway
+			events[i]->RegisteredWaits.erase(std::remove_if(events[i]->RegisteredWaits.begin(), events[i]->RegisteredWaits.end(), RemoveExpiredWaitHelper), events[i]->RegisteredWaits.end());
+
 			if(UnlockedWaitForEvent(events[i], 0) == 0)
 			{
 				result = pthread_mutex_unlock(&events[i]->Mutex);
@@ -257,7 +310,7 @@ namespace neosmart
 					return result;
 				}
 #endif
-				
+
 				if(waitAll)
 				{
 					--wfmo->Status.EventsLeft;
@@ -272,10 +325,10 @@ namespace neosmart
 				}
 			}
 			else
-			{				
+			{
 				events[i]->RegisteredWaits.push_back(waitInfo);
 				++wfmo->RefCount;
-				
+
 				int tempResult = pthread_mutex_unlock(&events[i]->Mutex);
 #ifdef PTHREADCHK
 				if(tempResult != 0)
@@ -287,7 +340,7 @@ namespace neosmart
 #endif
 			}
 		}
-		
+
 		timespec ts;
 		if(!done)
 		{
@@ -300,22 +353,22 @@ namespace neosmart
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
-				
+
 				uint64_t nanoseconds = ((uint64_t) tv.tv_sec) * 1000 * 1000 * 1000 + milliseconds * 1000 * 1000 + ((uint64_t) tv.tv_usec) * 1000;
-				
+
 				ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
 				ts.tv_nsec = (nanoseconds - ((uint64_t) ts.tv_sec) * 1000 * 1000 * 1000);
 			}
 		}
-		
+
 		while(!done)
 		{
 			//One (or more) of the events we're monitoring has been triggered?
-			
+
 			//If we're waiting for all events, assume we're done and check if there's an event that hasn't fired
 			//But if we're waiting for just one event, assume we're not done until we find a fired event
 			done = (waitAll && wfmo->Status.EventsLeft == 0) || (!waitAll && wfmo->Status.FiredEvent != -1);
-			
+
 			if(!done)
 			{
 				if(milliseconds != (uint64_t) -1)
@@ -326,15 +379,15 @@ namespace neosmart
 				{
 					result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
 				}
-				
+
 				if(result != 0)
 					break;
 			}
 		}
-		
+
 		waitIndex = wfmo->Status.FiredEvent;
 		wfmo->StillWaiting = false;
-		
+
 		--wfmo->RefCount;
 		if(wfmo->RefCount == 0)
 		{
@@ -353,11 +406,11 @@ namespace neosmart
 			}
 #endif
 		}
-		
+
 		return result;
 	}
 #endif
-	
+
 	int DestroyEvent(neosmart_event_t event)
 	{
 		int result = pthread_cond_destroy(&event->CVariable);
@@ -365,18 +418,18 @@ namespace neosmart
 		if(result != 0)
 			return result;
 #endif
-        
+
 		result = pthread_mutex_destroy(&event->Mutex);
 #ifdef PTHREADCHK
 		if(result != 0)
 			return result;
 #endif
-		
+
 		delete event;
-		
+
 		return 0;
 	}
-	
+
 	int SetEvent(neosmart_event_t event)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
@@ -384,9 +437,9 @@ namespace neosmart
 		if(result != 0)
 			return result;
 #endif
-		
+
 		event->State = true;
-		
+
 		//Depending on the event type, we either trigger everyone or only one
 		if(event->AutoReset)
 		{
@@ -410,9 +463,9 @@ namespace neosmart
 					event->RegisteredWaits.pop_front();
 					continue;
 				}
-				
+
 				event->State = false;
-				
+
 				if(i->Waiter->WaitAll)
 				{
 					--i->Waiter->Status.EventsLeft;
@@ -426,12 +479,12 @@ namespace neosmart
 					i->Waiter->Status.FiredEvent = i->WaitIndex;
 					i->Waiter->StillWaiting = false;
 				}
-				
+
 				pthread_mutex_unlock(&i->Waiter->Mutex);
 				result = pthread_cond_signal(&i->Waiter->CVariable);
 				event->RegisteredWaits.pop_front();
 				pthread_mutex_unlock(&event->Mutex);
-				
+
 				return result;
 			}
 #endif
@@ -448,7 +501,7 @@ namespace neosmart
 				}
 #endif
 				result = pthread_cond_signal(&event->CVariable);
-				
+
 				return result;
 			}
 		}
@@ -468,6 +521,7 @@ namespace neosmart
 				}
 #endif
 				--info->Waiter->RefCount;
+
 				if(!info->Waiter->StillWaiting)
 				{
 					if(info->Waiter->RefCount == 0)
@@ -489,7 +543,7 @@ namespace neosmart
 					}
 					continue;
 				}
-				
+
 				if(info->Waiter->WaitAll)
 				{
 					--info->Waiter->Status.EventsLeft;
@@ -503,7 +557,7 @@ namespace neosmart
 					info->Waiter->Status.FiredEvent = info->WaitIndex;
 					info->Waiter->StillWaiting = false;
 				}
-				
+
 				pthread_mutex_unlock(&info->Waiter->Mutex);
 				pthread_cond_signal(&info->Waiter->CVariable);
 			}
@@ -520,10 +574,10 @@ namespace neosmart
 #endif
 			result = pthread_cond_broadcast(&event->CVariable);
 		}
-		
+
 		return result;
 	}
-	
+
 	int ResetEvent(neosmart_event_t event)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
@@ -531,9 +585,9 @@ namespace neosmart
 		if(result != 0)
 			return result;
 #endif
-		
+
 		event->State = false;
-		
+
 		int tempResult = pthread_mutex_unlock(&event->Mutex);
 #ifdef PTHREADCHK
 		if (tempResult != 0)
@@ -543,7 +597,7 @@ namespace neosmart
 			return tempResult;
 		}
 #endif
-		
+
 		return result;
 	}
 }
