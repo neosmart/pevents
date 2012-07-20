@@ -71,6 +71,7 @@ namespace neosmart
 		if(wait.Waiter->StillWaiting == false)
 		{
 			--wait.Waiter->RefCount;
+			assert(wait.Waiter->RefCount >= 0);
 			if(wait.Waiter->RefCount == 0)
 			{
 				wait.Waiter->Destroy();
@@ -312,6 +313,7 @@ namespace neosmart
 		wfmo->StillWaiting = false;
 
 		--wfmo->RefCount;
+		assert(wfmo->RefCount >= 0);
 		if(wfmo->RefCount == 0)
 		{
 			wfmo->Destroy();
@@ -359,6 +361,7 @@ namespace neosmart
 				assert(result == 0);
 
 				--i->Waiter->RefCount;
+				assert(i->Waiter->RefCount >= 0);
 				if(!i->Waiter->StillWaiting)
 				{
 					if(i->Waiter->RefCount == 0)
@@ -428,6 +431,7 @@ namespace neosmart
 				assert(result == 0);
 
 				--info->Waiter->RefCount;
+				assert(info->Waiter->RefCount >= 0);
 
 				if(!info->Waiter->StillWaiting)
 				{
