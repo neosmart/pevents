@@ -26,6 +26,9 @@ namespace neosmart
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds);
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &index);
 #endif
+#ifdef PULSE
+	int PulseEvent(neosmart_event_t event);
+#endif
     
 	//POSIX-style functions
 	//TBD
