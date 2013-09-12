@@ -346,7 +346,17 @@ namespace neosmart
 
 	int DestroyEvent(neosmart_event_t event)
 	{
-		int result = pthread_cond_destroy(&event->CVariable);
+		int result = 0;
+
+#ifdef WFMO
+		result = pthread_mutex_lock(&event->Mutex);
+		assert(result == 0);
+		event->RegisteredWaits.erase(std::remove_if(event->RegisteredWaits.begin(), event->RegisteredWaits.end(), RemoveExpiredWaitHelper), event->RegisteredWaits.end());
+		result = pthread_mutex_unlock(&event->Mutex);
+		assert(result == 0);
+#endif
+
+		result = pthread_cond_destroy(&event->CVariable);
 		assert(result == 0);
 
 		result = pthread_mutex_destroy(&event->Mutex);
