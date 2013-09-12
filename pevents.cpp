@@ -166,7 +166,7 @@ namespace neosmart
 			result = 0;
 			event->State = false;
 		}
-		//Else we're trying to obtain a manual reset event with a signalled state;
+		//Else we're trying to obtain a manual reset event with a signaled state;
 		//don't do anything
 
 		return result;
