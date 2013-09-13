@@ -48,6 +48,8 @@ WIN32-style pevents API:
 
 	int ResetEvent(neosmart_event_t event);
 
+	int PulseEvent(neosmart_event_t event);
+
 POSIX-style pevents API:
 
 	//TBD
@@ -65,3 +67,10 @@ WFMO: Enables WFMO support in pevents. It is recommended to only compile
 with WFMO support if you are taking advantage of the
 WaitForMultipleEvents function, as it adds a (small) overhead to all
 event objects.
+
+PULSE: Enables the PulseEvent function. PulseEvent() on Windows is 
+fundamentally broken and should not be relied upon — it will almost 
+never do what you think you're doing when you call it. pevents includes 
+this function only to make porting existing (flawed) code from WIN32 to 
+*nix platforms easier, and this function is not compiled into pevents by
+default.

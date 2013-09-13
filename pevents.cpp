@@ -517,4 +517,24 @@ namespace neosmart
 
 		return 0;
 	}
+
+#ifdef PULSE
+	int PulseEvent(neosmart_event_t event)
+	{
+		//This may look like it's a horribly inefficient kludge with the sole intention of reducing code duplication,
+		//but in reality this is what any PulseEvent() implementation must look like. The only overhead (function 
+		//calls aside, which your compiler will likely optimize away, anyway), is if only WFMO auto-reset waits are active
+		//there will be overhead to unnecessarily obtain the event mutex for ResetEvent() after. In all other cases (being 
+		//no pending waits, WFMO manual-reset waits, or any WFSO waits), the event mutex must first be released for the
+		//waiting thread to resume action prior to locking the mutex again in order to set the event state to unsignaled, 
+		//or else the waiting threads will loop back into a wait (due to checks for spurious CVariable wakeups).
+
+		int result = SetEvent(event);
+		assert(result == 0);
+		result = ResetEvent(event);
+		assert(result == 0);
+
+		return 0;
+	}
+#endif
 }
