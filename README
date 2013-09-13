@@ -21,8 +21,8 @@ them to duplicate the essential features of WIN32 auto/manual-reset
 events.
 
 As mentioned earlier, pevents provides most of the functionality of
-WIN32 events. The features not included are named events, security
-attributes, and the completely useless PulseEvent.
+WIN32 events. The features not included are named events, and security
+attributes support.
 
 Usage:
 
