@@ -62,18 +62,18 @@ namespace neosmart
 	{
 		int result = pthread_mutex_trylock(&wait.Waiter->Mutex);
 
-		if(result == EBUSY)
+		if (result == EBUSY)
 		{
 			return false;
 		}
 
 		assert(result == 0);
 
-		if(wait.Waiter->StillWaiting == false)
+		if (wait.Waiter->StillWaiting == false)
 		{
 			--wait.Waiter->RefCount;
 			assert(wait.Waiter->RefCount >= 0);
-			if(wait.Waiter->RefCount == 0)
+			if (wait.Waiter->RefCount == 0)
 			{
 				wait.Waiter->Destroy();
 				delete wait.Waiter;
@@ -107,7 +107,7 @@ namespace neosmart
 		event->State = false;
 		event->AutoReset = !manualReset;
 
-		if(initialState)
+		if (initialState)
 		{
 			result = SetEvent(event);
 			assert(result == 0);
@@ -119,16 +119,16 @@ namespace neosmart
 	int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
 		int result = 0;
-		if(!event->State)
+		if (!event->State)
 		{
 			//Zero-timeout event state check optimization
-			if(milliseconds == 0)
+			if (milliseconds == 0)
 			{
 				return ETIMEDOUT;
 			}
 
 			timespec ts;
-			if(milliseconds != (uint64_t) -1)
+			if (milliseconds != (uint64_t) -1)
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
@@ -143,7 +143,7 @@ namespace neosmart
 			{
 				//Regardless of whether it's an auto-reset or manual-reset event:
 				//wait to obtain the event, then lock anyone else out
-				if(milliseconds != (uint64_t) -1)
+				if (milliseconds != (uint64_t) -1)
 				{
 					result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
 				}
@@ -151,15 +151,15 @@ namespace neosmart
 				{
 					result = pthread_cond_wait(&event->CVariable, &event->Mutex);
 				}
-			} while(result == 0 && !event->State);
+			} while (result == 0 && !event->State);
 
-			if(result == 0 && event->AutoReset)
+			if (result == 0 && event->AutoReset)
 			{
 				//We've only accquired the event if the wait succeeded
 				event->State = false;
 			}
 		}
-		else if(event->AutoReset)
+		else if (event->AutoReset)
 		{
 			//It's an auto-reset event that's currently available;
 			//we need to stop anyone else from using it
@@ -175,10 +175,10 @@ namespace neosmart
 	int WaitForEvent(neosmart_event_t event, uint64_t milliseconds)
 	{
 		int tempResult;
-		if(milliseconds == 0)
+		if (milliseconds == 0)
 		{
 			tempResult = pthread_mutex_trylock(&event->Mutex);
-			if(tempResult == EBUSY)
+			if (tempResult == EBUSY)
 			{
 				return ETIMEDOUT;
 			}
@@ -224,7 +224,7 @@ namespace neosmart
 		wfmo->StillWaiting = true;
 		wfmo->RefCount = 1;
 
-		if(waitAll)
+		if (waitAll)
 		{
 			wfmo->Status.EventsLeft = count;
 		}
@@ -239,7 +239,7 @@ namespace neosmart
 		bool done = false;
 		waitIndex = -1;
 
-		for(int i = 0; i < count; ++i)
+		for (int i = 0; i < count; ++i)
 		{
 			waitInfo.WaitIndex = i;
 
@@ -248,14 +248,14 @@ namespace neosmart
 			assert(tempResult == 0);
 
 			//Before adding this wait to the list of registered waits, let's clean up old, expired waits while we have the event lock anyway
-			events[i]->RegisteredWaits.erase(std::remove_if(events[i]->RegisteredWaits.begin(), events[i]->RegisteredWaits.end(), RemoveExpiredWaitHelper), events[i]->RegisteredWaits.end());
+			events[i]->RegisteredWaits.erase(std::remove_if (events[i]->RegisteredWaits.begin(), events[i]->RegisteredWaits.end(), RemoveExpiredWaitHelper), events[i]->RegisteredWaits.end());
 
-			if(UnlockedWaitForEvent(events[i], 0) == 0)
+			if (UnlockedWaitForEvent(events[i], 0) == 0)
 			{
 				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
 				assert(tempResult == 0);
 
-				if(waitAll)
+				if (waitAll)
 				{
 					--wfmo->Status.EventsLeft;
 					assert(wfmo->Status.EventsLeft >= 0);
@@ -279,14 +279,14 @@ namespace neosmart
 		}
 
 		timespec ts;
-		if(!done)
+		if (!done)
 		{
-			if(milliseconds == 0)
+			if (milliseconds == 0)
 			{
 				result = ETIMEDOUT;
 				done = true;
 			}
-			else if(milliseconds != (uint64_t) -1)
+			else if (milliseconds != (uint64_t) -1)
 			{
 				timeval tv;
 				gettimeofday(&tv, NULL);
@@ -298,7 +298,7 @@ namespace neosmart
 			}
 		}
 
-		while(!done)
+		while (!done)
 		{
 			//One (or more) of the events we're monitoring has been triggered?
 
@@ -306,9 +306,9 @@ namespace neosmart
 			//But if we're waiting for just one event, assume we're not done until we find a fired event
 			done = (waitAll && wfmo->Status.EventsLeft == 0) || (!waitAll && wfmo->Status.FiredEvent != -1);
 
-			if(!done)
+			if (!done)
 			{
-				if(milliseconds != (uint64_t) -1)
+				if (milliseconds != (uint64_t) -1)
 				{
 					result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
 				}
@@ -317,7 +317,7 @@ namespace neosmart
 					result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
 				}
 
-				if(result != 0)
+				if (result != 0)
 				{
 					break;
 				}
@@ -329,7 +329,7 @@ namespace neosmart
 
 		--wfmo->RefCount;
 		assert(wfmo->RefCount >= 0);
-		if(wfmo->RefCount == 0)
+		if (wfmo->RefCount == 0)
 		{
 			wfmo->Destroy();
 			delete wfmo;
@@ -351,7 +351,7 @@ namespace neosmart
 #ifdef WFMO
 		result = pthread_mutex_lock(&event->Mutex);
 		assert(result == 0);
-		event->RegisteredWaits.erase(std::remove_if(event->RegisteredWaits.begin(), event->RegisteredWaits.end(), RemoveExpiredWaitHelper), event->RegisteredWaits.end());
+		event->RegisteredWaits.erase(std::remove_if (event->RegisteredWaits.begin(), event->RegisteredWaits.end(), RemoveExpiredWaitHelper), event->RegisteredWaits.end());
 		result = pthread_mutex_unlock(&event->Mutex);
 		assert(result == 0);
 #endif
@@ -375,10 +375,10 @@ namespace neosmart
 		event->State = true;
 
 		//Depending on the event type, we either trigger everyone or only one
-		if(event->AutoReset)
+		if (event->AutoReset)
 		{
 #ifdef WFMO
-			while(!event->RegisteredWaits.empty())
+			while (!event->RegisteredWaits.empty())
 			{
 				neosmart_wfmo_info_t i = &event->RegisteredWaits.front();
 
@@ -387,9 +387,9 @@ namespace neosmart
 
 				--i->Waiter->RefCount;
 				assert(i->Waiter->RefCount >= 0);
-				if(!i->Waiter->StillWaiting)
+				if (!i->Waiter->StillWaiting)
 				{
-					if(i->Waiter->RefCount == 0)
+					if (i->Waiter->RefCount == 0)
 					{
 						i->Waiter->Destroy();
 						delete i->Waiter;
@@ -405,7 +405,7 @@ namespace neosmart
 
 				event->State = false;
 
-				if(i->Waiter->WaitAll)
+				if (i->Waiter->WaitAll)
 				{
 					--i->Waiter->Status.EventsLeft;
 					assert(i->Waiter->Status.EventsLeft >= 0);
@@ -434,7 +434,7 @@ namespace neosmart
 			}
 #endif
 			//event->State can be false if compiled with WFMO support
-			if(event->State)
+			if (event->State)
 			{
 				result = pthread_mutex_unlock(&event->Mutex);
 				assert(result == 0);
@@ -448,7 +448,7 @@ namespace neosmart
 		else
 		{
 #ifdef WFMO
-			for(size_t i = 0; i < event->RegisteredWaits.size(); ++i)
+			for (size_t i = 0; i < event->RegisteredWaits.size(); ++i)
 			{
 				neosmart_wfmo_info_t info = &event->RegisteredWaits[i];
 
@@ -458,9 +458,9 @@ namespace neosmart
 				--info->Waiter->RefCount;
 				assert(info->Waiter->RefCount >= 0);
 
-				if(!info->Waiter->StillWaiting)
+				if (!info->Waiter->StillWaiting)
 				{
-					if(info->Waiter->RefCount == 0)
+					if (info->Waiter->RefCount == 0)
 					{
 						info->Waiter->Destroy();
 						delete info->Waiter;
@@ -473,7 +473,7 @@ namespace neosmart
 					continue;
 				}
 
-				if(info->Waiter->WaitAll)
+				if (info->Waiter->WaitAll)
 				{
 					--info->Waiter->Status.EventsLeft;
 					assert(info->Waiter->Status.EventsLeft >= 0);
