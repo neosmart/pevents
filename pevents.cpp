@@ -21,14 +21,14 @@ namespace neosmart
 	{
 		pthread_mutex_t Mutex;
 		pthread_cond_t CVariable;
+		int RefCount;
 		union
 		{
 			int FiredEvent; //WFSO
 			int EventsLeft; //WFMO
 		} Status;
-		bool StillWaiting;
-		int RefCount;
 		bool WaitAll;
+		bool StillWaiting;
 
 		void Destroy()
 		{
@@ -48,9 +48,9 @@ namespace neosmart
 
 	struct neosmart_event_t_
 	{
-		bool AutoReset;
 		pthread_cond_t CVariable;
 		pthread_mutex_t Mutex;
+		bool AutoReset;
 		bool State;
 #ifdef WFMO
 		std::deque<neosmart_wfmo_info_t_> RegisteredWaits;
