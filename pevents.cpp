@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <pthread.h>
 #ifdef WFMO
 #include <algorithm>
 #include <deque>
