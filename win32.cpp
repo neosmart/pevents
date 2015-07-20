@@ -28,13 +28,13 @@ namespace neosmart
 		uint32_t result = 0;
 		HANDLE handle = static_cast<HANDLE>(event);
 
-		if (milliseconds == (uint64_t) -1)
+		//WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
+		if (milliseconds == ((uint64_t) -1) || (milliseconds >> 32) == 0)
 		{
-			result = WaitForSingleObject(handle, INFINITE);
+			result = WaitForSingleObject(handle, static_cast<uint32_t>(milliseconds));
 		}
 		else
 		{
-			//WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
 			//Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
 			uint32_t waitUnit = (INFINITE - 1);
 			uint64_t rounds = milliseconds / waitUnit;
@@ -79,13 +79,13 @@ namespace neosmart
 		HANDLE *handles = reinterpret_cast<HANDLE*>(events);
 		uint32_t result = 0;
 
-		if (milliseconds == (uint64_t) -1)
+		//WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
+		if (milliseconds == ((uint64_t) -1) || (milliseconds >> 32) == 0)
 		{
-			result = WaitForMultipleObjects(count, handles, waitAll, INFINITE);
+			result = WaitForMultipleObjects(count, handles, waitAll, static_cast<uint32_t>(milliseconds));
 		}
 		else
 		{
-			//WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
 			//Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
 			uint32_t waitUnit = (INFINITE - 1);
 			uint64_t rounds = milliseconds / waitUnit;
