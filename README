@@ -1,8 +1,12 @@
-pevents is a C++ library meant to provide an implementation of the WIN32
-events for POSIX systems. pevents is built on pthreads and provides
-*most* of the functionality of both manual- and auto-reset events on
-Windows, including simultaneous waits on multiple events (à la
-WaitForMultipleObjects).
+pevents is a cross-platform C++ library meant to provide an
+implementation of the WIN32 events for POSIX systems. pevents is built
+on pthreads and provides *most* of the functionality of both manual-
+and auto-reset events on Windows, including simultaneous waits on
+multiple events (à la WaitForMultipleObjects).
+
+pevents also doubles as a thin, sane wrapper for CreateEvent() & co. on
+Windows, meaning you can use pevents directly in your cross-platform
+code without #ifdefs for Windows/pthreads.
 
 pevents is developed and maintained by Mahmoud Al-Qudsi
 <mqudsi@neosmart.net> of NeoSmart Technologies <http://neosmart.net/>
@@ -21,8 +25,8 @@ them to duplicate the essential features of WIN32 auto/manual-reset
 events.
 
 As mentioned earlier, pevents provides most of the functionality of
-WIN32 events. The features not included are named events, and security
-attributes support.
+WIN32 events. The only features not included are only named events, and
+support for security attributes.
 
 Usage:
 
