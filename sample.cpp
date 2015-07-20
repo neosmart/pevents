@@ -1,65 +1,72 @@
-#include "pevents.h"
 #include <iostream>
-#include <pthread.h>
-#include <unistd.h>
 #include <assert.h>
+#include <thread>
+#include <chrono>
+//On Windows, you must include Winbase.h/Synchapi.h/Windows.h before pevents.h
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+#include "pevents.h"
 
 using namespace neosmart;
 using namespace std;
 
-void *numbers(void *param);
-void *letters(void *param);
-
-neosmart_event_t event[2];
+neosmart_event_t events[3]; //letters, numbers, abort
 char letter = '?';
 int number = -1;
 
-char lastChar = 'Z';
-int lastNum = 100;
+char lastChar = '\0';
+int lastNum = -1;
 
-void *letters(void *param)
+void letters()
 {
-	for(int i = 0; ; ++i)
+	for (uint32_t i = 0; WaitForEvent(events[2], 0) == WAIT_TIMEOUT; ++i)
 	{
 		letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i%26];
-		SetEvent(event[0]);
-		sleep(3);
+		SetEvent(events[0]);
+		this_thread::sleep_for(chrono::seconds(1));
 	}
 }
 
-void *numbers(void *param)
+void numbers()
 {
-	for(int i = 0; ; ++i)
+	for (uint32_t i = 0; WaitForEvent(events[2], 0) == WAIT_TIMEOUT; ++i)
 	{
 		number = i;
-		SetEvent(event[1]);
-		sleep(4);
+		SetEvent(events[1]);
+		this_thread::sleep_for(chrono::seconds(4));
 	}
 }
 
 int main()
 {
-	event[0] = CreateEvent();
-	event[1] = CreateEvent();
+	events[0] = CreateEvent(); //letters auto-reset event
+	events[1] = CreateEvent(); //numbers auto-reset event
+	events[2] = CreateEvent(true); //abort manual-reset event
 	
-	pthread_t thread1, thread2;
-	pthread_create(&thread1, NULL, letters, NULL);
-	pthread_create(&thread2, NULL, numbers, NULL);
+	std::thread thread1(letters);
+	std::thread thread2(numbers);
 	
-	for(int i = 0; i < 25; ++i)
+	for (uint32_t i = 0; lastChar != 'Z'; ++i)
 	{
-		int index = 7;
-		if(WaitForMultipleEvents(event, 2, false, -1, index) != 0)
+		int index = -1;
+		int result = WaitForMultipleEvents(events, 2, false, -1, index);
+
+		if (result == WAIT_TIMEOUT)
 		{
 			cout << "Timeout!" << endl;
 		}
-		else if(index == 0)
+		else if (result != 0)
+		{
+			cout << "Error in wait!" << endl;
+		}
+		else if (index == 0)
 		{
 			assert(lastChar != letter);
 			cout << letter << endl;
 			lastChar = letter;
 		}
-		else if(index == 1)
+		else if (index == 1)
 		{
 			assert(lastNum != number);
 			cout << number << endl;
@@ -67,11 +74,24 @@ int main()
 		}
 		else
 		{
-			cout << "ERROR! Index: " << index << endl;
+			cout << "ERROR! Unexpected index: " << index << endl;
 			exit(-1);
 		}
 	}
+
+	//You can't just DestroyEvent() and exit - it'll segfault 
+	//That's because letters() and numbers() will call SetEvent on a destroyed event
+	//You must *never* call SetEvent/ResetEvent on a destroyed event!
+	//So we set an abort event and wait for the helper threads to exit
+
+	//Set the abort
+	SetEvent(events[2]);
+
+	thread1.join();
+	thread2.join();
 	
-	DestroyEvent(event[0]);
-	DestroyEvent(event[1]);
+	for (auto event : events)
+	{
+		DestroyEvent(event);
+	}
 }
