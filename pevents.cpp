@@ -125,7 +125,7 @@ namespace neosmart
 			//Zero-timeout event state check optimization
 			if (milliseconds == 0)
 			{
-				return ETIMEDOUT;
+				return WAIT_TIMEOUT;
 			}
 
 			timespec ts;
@@ -181,7 +181,7 @@ namespace neosmart
 			tempResult = pthread_mutex_trylock(&event->Mutex);
 			if (tempResult == EBUSY)
 			{
-				return ETIMEDOUT;
+				return WAIT_TIMEOUT;
 			}
 		}
 		else
@@ -284,7 +284,7 @@ namespace neosmart
 		{
 			if (milliseconds == 0)
 			{
-				result = ETIMEDOUT;
+				result = WAIT_TIMEOUT;
 				done = true;
 			}
 			else if (milliseconds != (uint64_t) -1)

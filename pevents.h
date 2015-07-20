@@ -7,6 +7,10 @@
 
 #pragma once
 
+#ifndef WAIT_TIMEOUT
+#define WAIT_TIMEOUT ETIMEDOUT
+#endif
+
 #include <stdint.h>
 
 namespace neosmart
