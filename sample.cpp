@@ -1,3 +1,10 @@
+/*
+ * WIN32 Events for POSIX
+ * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
+ * Copyright (C) 2011 - 2015 by NeoSmart Technologies
+ * This code is released under the terms of the MIT License
+*/
+
 #include <iostream>
 #include <assert.h>
 #include <thread>
