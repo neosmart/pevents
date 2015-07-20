@@ -11,6 +11,7 @@
 #error Must include Windows.h prior to including pevents.h!
 #endif
 #ifndef WAIT_TIMEOUT
+#include <errno.h>
 #define WAIT_TIMEOUT ETIMEDOUT
 #endif
 
