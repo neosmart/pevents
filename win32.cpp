@@ -41,7 +41,7 @@ namespace neosmart
 			uint32_t remainder = milliseconds % waitUnit;
 
 			uint32_t result = WaitForSingleObject(handle, remainder);
-			while (result == WAIT_TIMEOUT && --rounds >= 0)
+			while (result == WAIT_TIMEOUT && rounds-- != 0)
 			{
 				result = WaitForSingleObject(handle, waitUnit);
 			}
@@ -92,7 +92,7 @@ namespace neosmart
 			uint32_t remainder = milliseconds % waitUnit;
 
 			uint32_t result = WaitForMultipleObjects(count, handles, waitAll, remainder);
-			while (result == WAIT_TIMEOUT && --rounds >= 0)
+			while (result == WAIT_TIMEOUT && rounds-- != 0)
 			{
 				result = WaitForMultipleObjects(count, handles, waitAll, waitUnit);
 			}
