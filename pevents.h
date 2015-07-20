@@ -3,10 +3,13 @@
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
  * Copyright (C) 2011 - 2013 by NeoSmart Technologies
  * This code is released under the terms of the MIT License
- */
+*/
 
 #pragma once
 
+#if defined(_WIN32) && !defined(CreateEvent)
+#error Must include Windows.h prior to including pevents.h!
+#endif
 #ifndef WAIT_TIMEOUT
 #define WAIT_TIMEOUT ETIMEDOUT
 #endif

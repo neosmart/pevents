@@ -3,7 +3,9 @@
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
  * Copyright (C) 2011 - 2013 by NeoSmart Technologies
  * This code is released under the terms of the MIT License
- */
+*/
+
+#ifndef _WIN32
 
 #include "pevents.h"
 #include <assert.h>
@@ -539,3 +541,5 @@ namespace neosmart
 	}
 #endif
 }
+
+#endif //_WIN32
