@@ -49,10 +49,16 @@ namespace neosmart
 
 		if (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED)
 		{
+			//We must swallow WAIT_ABANDONED because there is no such equivalent on *nix
 			return 0;
 		}
 
-		return result == WAIT_TIMEOUT ? 0 : GetLastError();
+		if (result == WAIT_TIMEOUT)
+		{
+			return WAIT_TIMEOUT;
+		}
+
+		return GetLastError();
 	}
 
 	int SetEvent(neosmart_event_t event)
