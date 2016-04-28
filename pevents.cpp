@@ -20,6 +20,9 @@
 namespace neosmart
 {
 #ifdef WFMO
+	//Each call to WaitForMultipleObjects initializes a neosmart_wfmo_t object which tracks
+	//the progress of the caller's multi-object wait and dispatches responses accordingly.
+	//One neosmart_wfmo_t struct is shared for all events in a single WFMO call
 	struct neosmart_wfmo_t_
 	{
 		pthread_mutex_t Mutex;
@@ -41,6 +44,8 @@ namespace neosmart
 	};
 	typedef neosmart_wfmo_t_ *neosmart_wfmo_t;
 
+	//A neosmart_wfmo_info_t object is registered with each event waited on in a WFMO
+	//This reference to neosmart_wfmo_t_ is how the event knows whom to notify when triggered
 	struct neosmart_wfmo_info_t_
 	{
 		neosmart_wfmo_t Waiter;
@@ -49,6 +54,7 @@ namespace neosmart
 	typedef neosmart_wfmo_info_t_ *neosmart_wfmo_info_t;
 #endif
 
+	//The basic event structure, passed to the caller as an opaque pointer when creating events
 	struct neosmart_event_t_
 	{
 		pthread_cond_t CVariable;
