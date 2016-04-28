@@ -189,7 +189,7 @@ namespace neosmart
 				matchingIndex = i;
 			}
 			//Even if it's the same one that just matched (i.e. matching index is last index)
-			if (event->RegisteredWaits[i + 1] == nullptr)
+			if (i == event->RegisteredWaitLength - 1 || event->RegisteredWaits[i + 1] == nullptr)
 			{
 				//It's hard to find a way of guaranteeing DeregisterWait isn't called for events that didn't need registration
 				if (matchingIndex != -1)
@@ -206,11 +206,12 @@ namespace neosmart
 	inline void UnlockedPopWait(neosmart_event_t_ *event)
 	{
 		//Since order isn't guaranteed, set first to last and last to nullptr
+		assert(event->RegisteredWaitLength > 0);
 		event->RegisteredWaits[0] = nullptr; //in case this is the only wait
-		for (size_t i = 1; event->RegisteredWaits[i] != nullptr; ++i)
+		for (size_t i = 1; i < event->RegisteredWaitLength && event->RegisteredWaits[i] != nullptr; ++i)
 		{
 			//Find and swap the last one
-			if (event->RegisteredWaits[i + 1] == nullptr)
+			if (i == event->RegisteredWaitLength - 1 || event->RegisteredWaits[i + 1] == nullptr)
 			{
 				event->RegisteredWaits[0] = event->RegisteredWaits[i];
 				event->RegisteredWaits[i] = nullptr;
@@ -397,8 +398,8 @@ namespace neosmart
 			for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits; *wfmo != nullptr; ++wfmo)
 			{
 				result = pthread_mutex_lock(&(*wfmo)->Mutex);
-				printf("pthread_mutex_lock returned %d\n", result);
-				assert(result == 0);
+				//printf("pthread_mutex_lock returned %d when called with mutex 0x%p\n", result, &(*wfmo)->Mutex);
+				assert (result == 0);
 
 				event->State = false;
 
