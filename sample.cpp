@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <thread>
 #include <chrono>
+#include <atomic>
+#include <signal.h>
+#include <random>
 //On Windows, you must include Winbase.h/Synchapi.h/Windows.h before pevents.h
 #ifdef _WIN32
 #include <Windows.h>
@@ -19,29 +22,42 @@ using namespace neosmart;
 using namespace std;
 
 neosmart_event_t events[3]; //letters, numbers, abort
+std::atomic<bool> interrupted { false };
 char letter = '?';
 int number = -1;
 
 char lastChar = '\0';
 int lastNum = -1;
 
+void intHandler(int sig) {
+	interrupted = true;
+	//unfortunately you can't use SetEvent here because posix signal handlers
+	//shouldn't use any non-reentrant code (like printf)
+	//on x86/x64, std::atomic<bool> is just a fancy way of doing a memory
+	//barrier and nothing more, so it is safe
+}
+
 void letters()
 {
-	for (uint32_t i = 0; WaitForEvent(events[2], 0) == WAIT_TIMEOUT; ++i)
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> dis(0, 3000);
+	for (uint32_t i = 0; WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT; ++i)
 	{
 		letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i%26];
 		SetEvent(events[0]);
-		this_thread::sleep_for(chrono::seconds(1));
 	}
 }
 
 void numbers()
 {
-	for (uint32_t i = 0; WaitForEvent(events[2], 0) == WAIT_TIMEOUT; ++i)
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> dis(0, 3000);
+	for (uint32_t i = 0; WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT; ++i)
 	{
 		number = i;
 		SetEvent(events[1]);
-		this_thread::sleep_for(chrono::seconds(4));
 	}
 }
 
@@ -50,12 +66,23 @@ int main()
 	events[0] = CreateEvent(); //letters auto-reset event
 	events[1] = CreateEvent(); //numbers auto-reset event
 	events[2] = CreateEvent(true); //abort manual-reset event
+
+	//after the abort event has been created
+	struct sigaction act = {0};
+	act.sa_handler = intHandler; //trigger abort on ctrl+c
+	sigaction(SIGINT, &act, NULL);
 	
 	std::thread thread1(letters);
 	std::thread thread2(numbers);
 	
 	for (uint32_t i = 0; lastChar != 'Z'; ++i)
 	{
+		if (interrupted)
+		{
+			printf("Interrupt triggered.. Aborting!\n");
+			break;
+		}
+
 		int index = -1;
 		int result = WaitForMultipleEvents(events, 2, false, -1, index);
 
