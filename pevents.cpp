@@ -21,6 +21,18 @@
 
 namespace neosmart
 {
+	__attribute__((always_inline)) void ValidateReturn(const char *function, const uint32_t line, uint8_t result)
+	{
+#ifdef DEBUG
+		if (result != 0)
+		{
+			fprintf(stderr, "%s:%d returned %u: %s\n", function, line, result, strerror(result));
+		}
+		assert(result == 0);
+#endif
+	}
+#define Validate(x) ValidateReturn(__FUNCTION__, __LINE__ - 1, x)
+
 #ifdef WFMO
 	//Each call to WaitForMultipleObjects initializes a neosmart_wfmo_t object which tracks
 	//the progress of the caller's multi-object wait and dispatches responses accordingly.
@@ -58,9 +70,9 @@ namespace neosmart
 		neosmart_event_t event = (neosmart_event_t) malloc(sizeof(neosmart_event_t_));
 
 		int result = pthread_cond_init(&event->CVariable, 0);
-		assert(result == 0);
+		Validate(result);
 		result = pthread_mutex_init(&event->Mutex, 0);
-		assert(result == 0);
+		Validate(result);
 
 		event->State = false;
 		event->AutoReset = !manualReset;
@@ -73,7 +85,7 @@ namespace neosmart
 		if (initialState)
 		{
 			result = SetEvent(event);
-			assert(result == 0);
+			Validate(result);
 		}
 
 		return event;
@@ -151,12 +163,12 @@ namespace neosmart
 			tempResult = pthread_mutex_lock(&event->Mutex);
 		}
 
-		assert(tempResult == 0);
+		Validate(tempResult);
 
 		int result = UnlockedWaitForEvent(event, milliseconds);
 
 		tempResult = pthread_mutex_unlock(&event->Mutex);
-		assert(tempResult == 0);
+		Validate(tempResult);
 
 		return result;
 	}
@@ -168,17 +180,17 @@ namespace neosmart
 		if (--wfmo->ReferenceCount == 0)
 		{
 			tempResult = pthread_mutex_unlock(&wfmo->Mutex);
-			assert(tempResult == 0);
+			Validate(tempResult);
 			tempResult = pthread_mutex_destroy(&wfmo->Mutex);
-			assert(tempResult == 0);
+			Validate(tempResult);
 			tempResult = pthread_cond_destroy(&wfmo->CVariable);
-			assert(tempResult == 0);
+			Validate(tempResult);
 			free(wfmo);
 		}
 		else
 		{
 			tempResult = pthread_mutex_unlock(&wfmo->Mutex);
-			assert(tempResult == 0);
+			Validate(tempResult);
 		}
 	}
 
@@ -233,9 +245,9 @@ namespace neosmart
 
 		int result = 0;
 		int tempResult = pthread_mutex_init(&wfmo->Mutex, 0);
-		assert(tempResult == 0);
+		Validate(tempResult);
 		tempResult = pthread_cond_init(&wfmo->CVariable, 0);
-		assert(tempResult == 0);
+		Validate(tempResult);
 
 		wfmo->WaitAll = waitAll;
 		wfmo->Status.FiredEvent = nullptr; //required for done check
@@ -247,21 +259,20 @@ namespace neosmart
 		}
 
 		tempResult = pthread_mutex_lock(&wfmo->Mutex);
-		assert(tempResult == 0);
+		Validate(tempResult);
 
 		bool done = false;
-
 		for (size_t i = 0; i < count; ++i)
 		{
 			//Must not release lock until RegisteredWait is potentially added
 			tempResult = pthread_mutex_lock(&events[i]->Mutex);
-			assert(tempResult == 0);
+			Validate(tempResult);
 
 			//Maybe the event is already unlocked, no need to register wait
 			if (UnlockedWaitForEvent(events[i], 0) == 0)
 			{
 				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
-				assert(tempResult == 0);
+				Validate(tempResult);
 
 				if (waitAll)
 				{
@@ -283,7 +294,7 @@ namespace neosmart
 				UnlockedEnqueueWait(events[i], wfmo);
 
 				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
-				assert(tempResult == 0);
+				Validate(tempResult);
 			}
 		}
 
@@ -363,17 +374,17 @@ namespace neosmart
 #ifdef WFMO
 		//printf("RegisteredWaitLength: %d\n", event->RegisteredWaitLength);
 		result = pthread_mutex_lock(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 		free(event->RegisteredWaits);
 		result = pthread_mutex_unlock(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 #endif
 
 		result = pthread_cond_destroy(&event->CVariable);
-		assert(result == 0);
+		Validate(result);
 
 		result = pthread_mutex_destroy(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 
 		delete event;
 
@@ -383,7 +394,7 @@ namespace neosmart
 	int SetEvent(neosmart_event_t_ *event)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 
 		bool signal = false; //see branching vs context switch question below
 		event->State = true;
@@ -402,7 +413,7 @@ namespace neosmart
 				}
 
 				result = pthread_mutex_lock(&wfmo->Mutex);
-				assert (result == 0);
+				Validate(result);
 
 				if (wfmo->WaitAll)
 				{
@@ -433,7 +444,7 @@ namespace neosmart
 				{
 					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
 					result = pthread_cond_signal(&wfmo->CVariable);
-					assert(result == 0);
+					Validate(result);
 				}
 
 				//if the wfmo was already fulfilled, state will still be true
@@ -445,15 +456,15 @@ namespace neosmart
 				else
 				{
 					result = pthread_mutex_unlock(&event->Mutex);
-					assert(result == 0);
+					Validate(result);
 					return 0;
 				}
 			}
 #endif //WFMO
 			result = pthread_mutex_unlock(&event->Mutex);
-			assert(result == 0);
+			Validate(result);
 			result = pthread_cond_signal(&event->CVariable);
-			assert(result == 0);
+			Validate(result);
 		}
 		else
 		{
@@ -461,7 +472,7 @@ namespace neosmart
 			for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits; *wfmo != nullptr; ++wfmo)
 			{
 				result = pthread_mutex_lock(&(*wfmo)->Mutex);
-				assert(result == 0);
+				Validate(result);
 
 				bool signal = false; //see branching vs context switch question below
 				if ((*wfmo)->WaitAll)
@@ -483,17 +494,17 @@ namespace neosmart
 				{
 					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
 					result = pthread_cond_signal(&(*wfmo)->CVariable);
-					assert(result == 0);
+					Validate(result);
 				}
 			}
 			//clear all waits
 			memset(event->RegisteredWaits, 0, event->RegisteredWaitLength * sizeof(neosmart_wfmo_t_*));
 #endif
 			result = pthread_mutex_unlock(&event->Mutex);
-			assert(result == 0);
+			Validate(result);
 
 			result = pthread_cond_broadcast(&event->CVariable);
-			assert(result == 0);
+			Validate(result);
 		}
 
 		return 0;
@@ -502,12 +513,12 @@ namespace neosmart
 	int ResetEvent(neosmart_event_t event)
 	{
 		int result = pthread_mutex_lock(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 
 		event->State = false;
 
 		result = pthread_mutex_unlock(&event->Mutex);
-		assert(result == 0);
+		Validate(result);
 
 		return 0;
 	}
@@ -524,9 +535,9 @@ namespace neosmart
 		//or else the waiting threads will loop back into a wait (due to checks for spurious CVariable wakeups).
 
 		int result = SetEvent(event);
-		assert(result == 0);
+		Validate(result);
 		result = ResetEvent(event);
-		assert(result == 0);
+		Validate(result);
 
 		return 0;
 	}
