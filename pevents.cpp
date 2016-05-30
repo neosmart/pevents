@@ -15,8 +15,9 @@
 #include <stdio.h>
 #include <string.h> //why on earth is memset in string.h?!?
 
-//How many WFMO registered waits to allocate room for on event creation
-#define REGISTERED_WAIT_PREALLOC 1 //must be more than 1 because we sometimes skip directly to index 1
+#ifndef REGISTERED_WAIT_PREALLOC
+#define REGISTERED_WAIT_PREALLOC 2
+#endif
 
 namespace neosmart
 {
