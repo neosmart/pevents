@@ -21,7 +21,7 @@
 
 namespace neosmart
 {
-	__attribute__((always_inline)) inline void ValidateReturn(const char *function, const uint32_t line, uint8_t result)
+	__attribute__((always_inline)) inline void ValidateReturn(const char *function __attribute__ ((unused)), const uint32_t line __attribute__ ((unused)), uint8_t result __attribute__ ((unused)))
 	{
 #ifdef DEBUG
 		if (result != 0)
