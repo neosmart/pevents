@@ -13,9 +13,10 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h> //why on earth is memset in string.h?!?
 
 //How many WFMO registered waits to allocate room for on event creation
-#define REGISTERED_WAIT_PREALLOC 1
+#define REGISTERED_WAIT_PREALLOC 1 //must be more than 1 because we sometimes skip directly to index 1
 
 namespace neosmart
 {
@@ -30,8 +31,9 @@ namespace neosmart
 		union
 		{
 			neosmart_event_t_ *FiredEvent; //WFSO or WFMO w/ !WaitAll
-			int EventsLeft; //WFMO
+			int EventsLeft; //WFMO w/ WaitAll
 		} Status;
+		int ReferenceCount;
 		bool WaitAll;
 	};
 	typedef neosmart_wfmo_t_ *neosmart_wfmo_t;
@@ -44,13 +46,13 @@ namespace neosmart
 		pthread_mutex_t Mutex;
 #ifdef WFMO
 		neosmart_wfmo_t_ **RegisteredWaits; //array of pointers to WFMO/WFSO calls waiting on this event
-#endif
 		int RegisteredWaitLength;
+#endif
 		bool AutoReset;
 		bool State;
 	};
 
-	neosmart_event_t CreateEvent(bool manualReset, bool initialState)
+	neosmart_event_t CreateEvent(bool initialState, bool manualReset)
 	{
 		neosmart_event_t event = (neosmart_event_t) malloc(sizeof(neosmart_event_t_));
 
@@ -64,8 +66,7 @@ namespace neosmart
 #ifdef WFMO
 		//Allocate room for at least one event in our RegisteredWaits "array"
 		event->RegisteredWaitLength = REGISTERED_WAIT_PREALLOC;
-		event->RegisteredWaits = (neosmart_wfmo_t_ **) malloc(sizeof(neosmart_wfmo_t_ *) * event->RegisteredWaitLength);
-		event->RegisteredWaits[0] = nullptr;
+		event->RegisteredWaits = (neosmart_wfmo_t_ **) calloc(event->RegisteredWaitLength, sizeof(neosmart_wfmo_t_*));
 #endif
 
 		if (initialState)
@@ -160,7 +161,27 @@ namespace neosmart
 	}
 
 #ifdef WFMO
-	inline void UnlockedRegisterWait(neosmart_event_t_ *event, neosmart_wfmo_t_ *wait)
+	inline void UnlockWfmo(neosmart_wfmo_t_ *wfmo)
+	{
+		int tempResult = 0;
+		if (--wfmo->ReferenceCount == 0)
+		{
+			tempResult = pthread_mutex_unlock(&wfmo->Mutex);
+			assert(tempResult == 0);
+			tempResult = pthread_mutex_destroy(&wfmo->Mutex);
+			assert(tempResult == 0);
+			tempResult = pthread_cond_destroy(&wfmo->CVariable);
+			assert(tempResult == 0);
+			free(wfmo);
+		}
+		else
+		{
+			tempResult = pthread_mutex_unlock(&wfmo->Mutex);
+			assert(tempResult == 0);
+		}
+	}
+
+	inline void UnlockedEnqueueWait(neosmart_event_t_ *event, neosmart_wfmo_t_ *wait)
 	{
 		for (size_t i = 0; i < event->RegisteredWaitLength; ++i)
 		{
@@ -172,42 +193,19 @@ namespace neosmart
 		}
 
 		//Not enough room. Need to expand the array of registered waits to fit this wait
-		event->RegisteredWaits = (neosmart_wfmo_t_ **) realloc(event->RegisteredWaits, sizeof(neosmart_wfmo_t **) * event->RegisteredWaitLength * 2);
+		event->RegisteredWaits = (neosmart_wfmo_t_ **) realloc(event->RegisteredWaits, sizeof(neosmart_wfmo_t_ *) * event->RegisteredWaitLength * 2);
 		assert(event->RegisteredWaits != nullptr);
+		memset(event->RegisteredWaits + event->RegisteredWaitLength, 0, event->RegisteredWaitLength * sizeof(neosmart_wfmo_t_ *)); //zero out the newly-assigned second half of the array
 		event->RegisteredWaits[event->RegisteredWaitLength] = wait;
 		event->RegisteredWaitLength = event->RegisteredWaitLength * 2;
 	}
 
-	inline void UnlockedDeregisterWait(neosmart_event_t_ *event, neosmart_wfmo_t_ *wait)
-	{
-		//Since order isn't guaranteed, set this wait to last and last to nullptr
-		size_t matchingIndex = -1;
-		for (size_t i = 0; i < event->RegisteredWaitLength; ++i)
-		{
-			if (event->RegisteredWaits[i] == wait)
-			{
-				matchingIndex = i;
-			}
-			//Even if it's the same one that just matched (i.e. matching index is last index)
-			if (i == event->RegisteredWaitLength - 1 || event->RegisteredWaits[i + 1] == nullptr)
-			{
-				//It's hard to find a way of guaranteeing DeregisterWait isn't called for events that didn't need registration
-				if (matchingIndex != -1)
-				{
-					assert(matchingIndex != -1);
-					event->RegisteredWaits[matchingIndex] = event->RegisteredWaits[i];
-					event->RegisteredWaits[i] = nullptr;
-				}
-				return;
-			}
-		}
-	}
-
-	inline void UnlockedPopWait(neosmart_event_t_ *event)
+	inline neosmart_wfmo_t_ *UnlockedDequeueWait(neosmart_event_t_ *event)
 	{
 		//Since order isn't guaranteed, set first to last and last to nullptr
 		assert(event->RegisteredWaitLength > 0);
-		event->RegisteredWaits[0] = nullptr; //in case this is the only wait
+		neosmart_wfmo_t_ *result = event->RegisteredWaits[0];
+		event->RegisteredWaits[0] = nullptr; //in case this is the only wait (or the queue is empty)
 		for (size_t i = 1; i < event->RegisteredWaitLength && event->RegisteredWaits[i] != nullptr; ++i)
 		{
 			//Find and swap the last one
@@ -215,9 +213,10 @@ namespace neosmart
 			{
 				event->RegisteredWaits[0] = event->RegisteredWaits[i];
 				event->RegisteredWaits[i] = nullptr;
-				return;
+				break;
 			}
 		}
+		return result;
 	}
 
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds)
@@ -228,36 +227,36 @@ namespace neosmart
 
 	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &waitIndex)
 	{
-		neosmart_wfmo_t_ wfmo;
+		waitIndex = -1;
+		neosmart_wfmo_t_ *wfmo = (neosmart_wfmo_t_ *)malloc(sizeof(neosmart_wfmo_t_));
 
 		int result = 0;
-
-		int tempResult = pthread_mutex_init(&wfmo.Mutex, 0);
+		int tempResult = pthread_mutex_init(&wfmo->Mutex, 0);
 		assert(tempResult == 0);
-		tempResult = pthread_cond_init(&wfmo.CVariable, 0);
+		tempResult = pthread_cond_init(&wfmo->CVariable, 0);
 		assert(tempResult == 0);
 
-		wfmo.WaitAll = waitAll;
-		wfmo.Status.FiredEvent = nullptr; //required for done check
+		wfmo->WaitAll = waitAll;
+		wfmo->Status.FiredEvent = nullptr; //required for done check
+		wfmo->ReferenceCount = 1; //us
 
 		if (waitAll)
 		{
-			wfmo.Status.EventsLeft = count;
+			wfmo->Status.EventsLeft = count;
 		}
 
-		tempResult = pthread_mutex_lock(&wfmo.Mutex);
+		tempResult = pthread_mutex_lock(&wfmo->Mutex);
 		assert(tempResult == 0);
 
 		bool done = false;
 
-		int registerRange = 0; //number of events we registered with, so we don't needlessly attempt a wait de-registration
-		for (int i = 0; i < count; ++i)
+		for (size_t i = 0; i < count; ++i)
 		{
 			//Must not release lock until RegisteredWait is potentially added
 			tempResult = pthread_mutex_lock(&events[i]->Mutex);
 			assert(tempResult == 0);
 
-			//Maybe the event is already unlocked, no need to wait
+			//Maybe the event is already unlocked, no need to register wait
 			if (UnlockedWaitForEvent(events[i], 0) == 0)
 			{
 				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
@@ -265,13 +264,13 @@ namespace neosmart
 
 				if (waitAll)
 				{
-					--wfmo.Status.EventsLeft;
-					done = wfmo.Status.EventsLeft == 0;
-					assert(wfmo.Status.EventsLeft >= 0);
+					--wfmo->Status.EventsLeft;
+					done = wfmo->Status.EventsLeft == 0;
+					assert(wfmo->Status.EventsLeft >= 0);
 				}
 				else
 				{
-					wfmo.Status.FiredEvent = events[i];
+					wfmo->Status.FiredEvent = events[i];
 					waitIndex = i;
 					done = true;
 					break;
@@ -279,8 +278,8 @@ namespace neosmart
 			}
 			else
 			{
-				registerRange = i;
-				UnlockedRegisterWait(events[i], &wfmo);
+				++wfmo->ReferenceCount;
+				UnlockedEnqueueWait(events[i], wfmo);
 
 				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
 				assert(tempResult == 0);
@@ -309,21 +308,21 @@ namespace neosmart
 
 		while (!done)
 		{
-			//One (or more) of the events we're monitoring has been triggered?
+			//One (or more) of the events we're monitoring has been triggered? (or none; remember, spurious waits!)
 
 			//If we're waiting for all events, assume we're done and check if there's an event that hasn't fired
 			//But if we're waiting for just one event, assume we're not done until we find a fired event
-			done = (waitAll && wfmo.Status.EventsLeft == 0) || (!waitAll && wfmo.Status.FiredEvent != nullptr);
+			done = (waitAll && wfmo->Status.EventsLeft == 0) || (!waitAll && wfmo->Status.FiredEvent != nullptr);
 
 			if (!done)
 			{
 				if (milliseconds != (uint64_t) -1)
 				{
-					result = pthread_cond_timedwait(&wfmo.CVariable, &wfmo.Mutex, &ts);
+					result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
 				}
 				else
 				{
-					result = pthread_cond_wait(&wfmo.CVariable, &wfmo.Mutex);
+					result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
 				}
 
 				if (result != 0)
@@ -334,28 +333,23 @@ namespace neosmart
 		}
 		assert(done);
 
-		//Determine fired event index, unregister waits
-		//TODO: change this back to i < registerRange after assertion failure is fixed
-		for (int i = 0; i < count; ++i)
+		//Determine fired event index if unknown
+		//If we terminated early (during wait registration), the waitIndex is already determined
+		if (waitIndex == -1)
 		{
-			//A triggered event automatically de-registers triggered WFMOs on its own, so don't remove it here
-			if (events[i] == wfmo.Status.FiredEvent)
+			for (int i = 0; i < count; ++i)
 			{
-				waitIndex = i;
-			}
-			else
-			{
-				tempResult = pthread_mutex_lock(&events[i]->Mutex);
-				assert(tempResult == 0);
-				UnlockedDeregisterWait(events[i], &wfmo);
-				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
-				assert(tempResult == 0);
+				if (events[i] == wfmo->Status.FiredEvent)
+				{
+					waitIndex = i;
+					break;
+				}
 			}
 		}
 
 		//Done. Release resources and get out of here.
-		pthread_mutex_destroy(&wfmo.Mutex);
-		pthread_cond_destroy(&wfmo.CVariable);
+		UnlockWfmo(wfmo);
+		//do not need to signal the CV because we are the only ones to ever wait on it
 
 		return result;
 	}
@@ -366,6 +360,7 @@ namespace neosmart
 		int result = 0;
 
 #ifdef WFMO
+		//printf("RegisteredWaitLength: %d\n", event->RegisteredWaitLength);
 		result = pthread_mutex_lock(&event->Mutex);
 		assert(result == 0);
 		free(event->RegisteredWaits);
@@ -389,54 +384,75 @@ namespace neosmart
 		int result = pthread_mutex_lock(&event->Mutex);
 		assert(result == 0);
 
+		bool signal = false; //see branching vs context switch question below
 		event->State = true;
 
 		//Depending on the event type, we either trigger everyone or only one
 		if (event->AutoReset)
 		{
 #ifdef WFMO
-			for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits; *wfmo != nullptr; ++wfmo)
+			while (true)
 			{
-				result = pthread_mutex_lock(&(*wfmo)->Mutex);
-				//printf("pthread_mutex_lock returned %d when called with mutex 0x%p\n", result, &(*wfmo)->Mutex);
+				neosmart_wfmo_t_ *wfmo = UnlockedDequeueWait(event);
+				if (wfmo == nullptr)
+				{
+					assert(event->State);
+					break;
+				}
+
+				result = pthread_mutex_lock(&wfmo->Mutex);
 				assert (result == 0);
 
-				event->State = false;
-
-				if ((*wfmo)->WaitAll)
+				if (wfmo->WaitAll)
 				{
-					--(*wfmo)->Status.EventsLeft;
-					assert((*wfmo)->Status.EventsLeft >= 0);
+					//RegisteredWaits with WaitAll are guaranteed not to have been fulfilled...
+					//An autoreset event *must* instantly switch to reset state after being successfully triggered
+					event->State = false;
+					--wfmo->Status.EventsLeft;
+					assert(wfmo->Status.EventsLeft >= 0);
+					signal = wfmo->Status.EventsLeft == 0; //see branching vs context switch question below
 				}
 				else
 				{
-					(*wfmo)->Status.FiredEvent = event;
+					//...on the other hand, !WaitAll could have been already fulfilled
+					if (wfmo->Status.FiredEvent == nullptr)
+					{
+						//An autoreset event *must* instantly switch to reset state after being successfully triggered
+						event->State = false;
+						wfmo->Status.FiredEvent = event;
+						signal = true; //see branching vs context switch question below
+					}
 				}
 
-				result = pthread_mutex_unlock(&(*wfmo)->Mutex);
-				assert(result == 0);
-				result = pthread_cond_signal(&(*wfmo)->CVariable);
-				assert(result == 0);
+				//Done. Release resources and get out of here.
+				UnlockWfmo(wfmo);
+				//I'm not sure what's cheaper: a branch or an unnecessary kernel context switch
+				//assuming branching for now... otherwise we'd signal unconditionally
+				if (signal)
+				{
+					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
+					result = pthread_cond_signal(&wfmo->CVariable);
+					assert(result == 0);
+				}
 
-				UnlockedPopWait(event);
-
-				result = pthread_mutex_unlock(&event->Mutex);
-				assert(result == 0);
-
-				return 0;
+				//if the wfmo was already fulfilled, state will still be true
+				//try again, if possible (this could go in the while precondition, but this is saner for code review)
+				if (event->State)
+				{
+					continue;
+				}
+				else
+				{
+					result = pthread_mutex_unlock(&event->Mutex);
+					assert(result == 0);
+					return 0;
+				}
 			}
-#endif
-			//event->State can be false if compiled with WFMO support
-			if (event->State)
-			{
-				result = pthread_mutex_unlock(&event->Mutex);
-				assert(result == 0);
-
-				result = pthread_cond_signal(&event->CVariable);
-				assert(result == 0);
-
-				return 0;
-			}
+#endif //WFMO
+			result = pthread_mutex_unlock(&event->Mutex);
+			assert(result == 0);
+			result = pthread_cond_signal(&event->CVariable);
+			assert(result == 0);
 		}
 		else
 		{
@@ -446,23 +462,31 @@ namespace neosmart
 				result = pthread_mutex_lock(&(*wfmo)->Mutex);
 				assert(result == 0);
 
+				bool signal = false; //see branching vs context switch question below
 				if ((*wfmo)->WaitAll)
 				{
 					--(*wfmo)->Status.EventsLeft;
 					assert((*wfmo)->Status.EventsLeft >= 0);
+					signal = (*wfmo)->Status.EventsLeft == 0; //see branching vs context switch question below
 				}
-				else
+				else if ((*wfmo)->Status.FiredEvent == nullptr)
 				{
+					signal = true; //see branching vs context switch question below
 					(*wfmo)->Status.FiredEvent = event;
 				}
 
-				result = pthread_mutex_unlock(&(*wfmo)->Mutex);
-				assert(result == 0);
-
-				result = pthread_cond_signal(&(*wfmo)->CVariable);
-				assert(result == 0);
+				UnlockWfmo(*wfmo);
+				//I'm not sure what's cheaper: a branch or an unnecessary kernel context switch
+				//assuming branching for now... otherwise we'd signal unconditionally
+				if (signal)
+				{
+					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
+					result = pthread_cond_signal(&(*wfmo)->CVariable);
+					assert(result == 0);
+				}
 			}
-			event->RegisteredWaits[0] = nullptr;
+			//clear all waits
+			memset(event->RegisteredWaits, 0, event->RegisteredWaitLength * sizeof(neosmart_wfmo_t_*));
 #endif
 			result = pthread_mutex_unlock(&event->Mutex);
 			assert(result == 0);
