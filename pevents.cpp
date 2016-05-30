@@ -424,16 +424,13 @@ namespace neosmart
 					assert(wfmo->Status.EventsLeft >= 0);
 					signal = wfmo->Status.EventsLeft == 0; //see branching vs context switch question below
 				}
-				else
+				//...on the other hand, !WaitAll could have been already fulfilled
+				else if (wfmo->Status.FiredEvent == nullptr)
 				{
-					//...on the other hand, !WaitAll could have been already fulfilled
-					if (wfmo->Status.FiredEvent == nullptr)
-					{
-						//An autoreset event *must* instantly switch to reset state after being successfully triggered
-						event->State = false;
-						wfmo->Status.FiredEvent = event;
-						signal = true; //see branching vs context switch question below
-					}
+					//An autoreset event *must* instantly switch to reset state after being successfully triggered
+					event->State = false;
+					wfmo->Status.FiredEvent = event;
+					signal = true; //see branching vs context switch question below
 				}
 
 				//Done. Release resources and get out of here.
