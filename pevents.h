@@ -30,7 +30,7 @@ namespace neosmart
 	int SetEvent(neosmart_event_t event);
 	int ResetEvent(neosmart_event_t event);
 #ifdef WFMO
-	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int *waitIndex = nullptr);
+	int WaitForMultipleEvents(neosmart_event_t *events, uint32_t count, bool waitAll, uint64_t milliseconds, uint32_t *waitIndex = nullptr);
 #endif
 #ifdef PULSE
 	int PulseEvent(neosmart_event_t event);

@@ -44,9 +44,9 @@ namespace neosmart
 		union
 		{
 			neosmart_event_t_ *FiredEvent; //WFSO or WFMO w/ !WaitAll
-			int EventsLeft; //WFMO w/ WaitAll
+			uint32_t EventsLeft; //WFMO w/ WaitAll
 		} Status;
-		int ReferenceCount;
+		uint32_t ReferenceCount;
 		bool WaitAll;
 	};
 	typedef neosmart_wfmo_t_ *neosmart_wfmo_t;
@@ -59,7 +59,7 @@ namespace neosmart
 		pthread_mutex_t Mutex;
 #ifdef WFMO
 		neosmart_wfmo_t_ **RegisteredWaits; //array of pointers to WFMO/WFSO calls waiting on this event
-		int RegisteredWaitLength;
+		uint32_t RegisteredWaitLength;
 #endif
 		bool AutoReset;
 		bool State;
@@ -216,7 +216,6 @@ namespace neosmart
 	inline neosmart_wfmo_t_ *UnlockedDequeueWait(neosmart_event_t_ *event)
 	{
 		//Since order isn't guaranteed, set first to last and last to nullptr
-		assert(event->RegisteredWaitLength > 0);
 		neosmart_wfmo_t_ *result = event->RegisteredWaits[0];
 		event->RegisteredWaits[0] = nullptr; //in case this is the only wait (or the queue is empty)
 		for (size_t i = 1; i < event->RegisteredWaitLength && event->RegisteredWaits[i] != nullptr; ++i)
@@ -232,9 +231,9 @@ namespace neosmart
 		return result;
 	}
 
-	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int *waitIndex)
+	int WaitForMultipleEvents(neosmart_event_t *events, uint32_t count, bool waitAll, uint64_t milliseconds, uint32_t *waitIndex)
 	{
-		int waitIndexResult = -1;
+		uint32_t waitIndexResult = -1u;
 		neosmart_wfmo_t_ *wfmo = (neosmart_wfmo_t_ *)malloc(sizeof(neosmart_wfmo_t_));
 
 		int result = 0;
@@ -272,7 +271,6 @@ namespace neosmart
 				{
 					--wfmo->Status.EventsLeft;
 					done = wfmo->Status.EventsLeft == 0;
-					assert(wfmo->Status.EventsLeft >= 0);
 				}
 				else
 				{
@@ -344,9 +342,9 @@ namespace neosmart
 		if (waitIndex != nullptr)
 		{
 			*waitIndex = waitIndexResult;
-			if (waitIndexResult == -1)
+			if (waitIndexResult == -1u)
 			{
-				for (int i = 0; i < count; ++i)
+				for (uint32_t i = 0; i < count; ++i)
 				{
 					if (events[i] == wfmo->Status.FiredEvent)
 					{
@@ -419,7 +417,6 @@ namespace neosmart
 					//An autoreset event *must* instantly switch to reset state after being successfully triggered
 					event->State = false;
 					--wfmo->Status.EventsLeft;
-					assert(wfmo->Status.EventsLeft >= 0);
 					signal = wfmo->Status.EventsLeft == 0; //see branching vs context switch question below
 				}
 				//...on the other hand, !WaitAll could have been already fulfilled
@@ -473,7 +470,6 @@ namespace neosmart
 				if ((*wfmo)->WaitAll)
 				{
 					--(*wfmo)->Status.EventsLeft;
-					assert((*wfmo)->Status.EventsLeft >= 0);
 					signal = (*wfmo)->Status.EventsLeft == 0; //see branching vs context switch question below
 				}
 				else if ((*wfmo)->Status.FiredEvent == nullptr)
