@@ -232,15 +232,9 @@ namespace neosmart
 		return result;
 	}
 
-	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds)
+	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int *waitIndex)
 	{
-		int unused;
-		return WaitForMultipleEvents(events, count, waitAll, milliseconds, unused);
-	}
-
-	int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll, uint64_t milliseconds, int &waitIndex)
-	{
-		waitIndex = -1;
+		int waitIndexResult = -1;
 		neosmart_wfmo_t_ *wfmo = (neosmart_wfmo_t_ *)malloc(sizeof(neosmart_wfmo_t_));
 
 		int result = 0;
@@ -283,7 +277,7 @@ namespace neosmart
 				else
 				{
 					wfmo->Status.FiredEvent = events[i];
-					waitIndex = i;
+					waitIndexResult = i;
 					done = true;
 					break;
 				}
@@ -345,16 +339,20 @@ namespace neosmart
 		}
 		assert(done);
 
-		//Determine fired event index if unknown
+		//Determine fired event index if unknown (but don't do this if the caller doesn't care about it)
 		//If we terminated early (during wait registration), the waitIndex is already determined
-		if (waitIndex == -1)
+		if (waitIndex != nullptr)
 		{
-			for (int i = 0; i < count; ++i)
+			*waitIndex = waitIndexResult;
+			if (waitIndexResult == -1)
 			{
-				if (events[i] == wfmo->Status.FiredEvent)
+				for (int i = 0; i < count; ++i)
 				{
-					waitIndex = i;
-					break;
+					if (events[i] == wfmo->Status.FiredEvent)
+					{
+						*waitIndex = i;
+						break;
+					}
 				}
 			}
 		}
