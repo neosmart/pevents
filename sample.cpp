@@ -21,10 +21,13 @@
 using namespace neosmart;
 using namespace std;
 
-neosmart_event_t events[3]; //letters, numbers, abort
-std::atomic<bool> interrupted { false };
-char letter = '?';
-int number = -1;
+neosmart_event_t events[5]; //letters, numbers, abort, letterSync, numberSync
+std::atomic<bool> interrupted { false }; //for signal handling
+
+//by leaving these originally unassigned, any access to unitialized memory 
+//will be flagged by valgrind
+char letter;
+int number;
 
 char lastChar = '\0';
 int lastNum = -1;
@@ -39,41 +42,77 @@ void intHandler(int sig) {
 
 void letters()
 {
+	static uint32_t letterIndex = 0;
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<int> dis(0, 3000);
-	for (uint32_t i = 0; WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT; ++i)
+
+	//wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
+	while (WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT)
 	{
-		letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i%26];
-		SetEvent(events[0]);
+		//remember that another instance of this function may be executing concurrently, so after
+		//the sleep finishes, make sure to obtain exclusive access by means of this auto-reset event
+		auto waitResult = WaitForEvent(events[3]); //only one thread here at a time
+		assert(waitResult == 0);
+		letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[letterIndex%26];
+		++letterIndex;
+		SetEvent(events[0]); //signal main thread to print generated letter
 	}
 }
 
 void numbers()
 {
+	static uint32_t numberIndex = 0;
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<int> dis(0, 3000);
-	for (uint32_t i = 0; WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT; ++i)
+
+	//wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
+	while (WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT)
 	{
-		number = i;
-		SetEvent(events[1]);
+		//remember that another instance of this function may be executing concurrently, so after
+		//the sleep finishes, make sure to obtain exclusive access by means of this auto-reset event
+		auto waitResult = WaitForEvent(events[4]); //only one thread here at a time
+		assert(waitResult == 0);
+		number = numberIndex;
+		++numberIndex;
+		SetEvent(events[1]); //signal main thread to print generated number
 	}
 }
 
 int main()
 {
-	events[0] = CreateEvent(); //letters auto-reset event
-	events[1] = CreateEvent(); //numbers auto-reset event
-	events[2] = CreateEvent(true); //abort manual-reset event
+	events[0] = CreateEvent(); //letter available auto-reset event, initially unavailable
+	events[1] = CreateEvent(); //number available auto-reset event, initially unavailable
+	events[2] = CreateEvent(false, true); //abort manual-reset event
+	events[3] = CreateEvent(true); //letter protection auto-reset event (instead of a mutex), initially available
+	events[4] = CreateEvent(true); //number protection auto-reset event (instead of a mutex), initially available
 
 	//after the abort event has been created
 	struct sigaction act = {0};
 	act.sa_handler = intHandler; //trigger abort on ctrl+c
 	sigaction(SIGINT, &act, NULL);
+
+	vector<std::thread> threads;
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> dis(1, 10);
+
+	uint32_t letterThreadCount = dis(gen);
+	uint32_t numberThreadCount = dis(gen);
+
+	for (uint32_t i = 0; i < letterThreadCount; ++i)
+	{
+		threads.emplace_back(letters);
+	}
+	for (uint32_t i = 0; i < numberThreadCount; ++i)
+	{
+		threads.emplace_back(numbers);
+	}
 	
-	std::thread thread1(letters);
-	std::thread thread2(numbers);
+	printf("Started %u letter threads\n", letterThreadCount);
+	printf("Started %u number threads\n", numberThreadCount);
 	
 	for (uint32_t i = 0; lastChar != 'Z'; ++i)
 	{
@@ -89,22 +128,28 @@ int main()
 		if (result == WAIT_TIMEOUT)
 		{
 			cout << "Timeout!" << endl;
+			assert(false);
 		}
 		else if (result != 0)
 		{
 			cout << "Error in wait!" << endl;
+			assert(false);
 		}
 		else if (index == 0)
 		{
-			assert(lastChar != letter);
+			//printf("lastChar: %c, char: %c\n", lastChar, letter);
+			assert(letter == 'A' || (lastChar + 1) == letter);
 			cout << letter << endl;
 			lastChar = letter;
+			SetEvent(events[3]); //safe for another thread to enter this loop
 		}
 		else if (index == 1)
 		{
-			assert(lastNum != number);
+			//printf("lastNum: %d, num: %d\n", lastNum, number);
+			assert(number == 0 || lastNum + 1 == number);
 			cout << number << endl;
 			lastNum = number;
+			SetEvent(events[4]); //safe for another thread to enter this loop
 		}
 		else
 		{
@@ -121,8 +166,10 @@ int main()
 	//Set the abort
 	SetEvent(events[2]);
 
-	thread1.join();
-	thread2.join();
+	for (auto &thread : threads)
+	{
+		thread.join();
+	}
 	
 	for (auto event : events)
 	{
