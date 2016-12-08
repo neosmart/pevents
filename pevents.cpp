@@ -13,7 +13,9 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <time.h>
 #include <string.h> //why on earth is memset in string.h?!?
+#include "fastrand.h"
 
 #ifndef REGISTERED_WAIT_PREALLOC
 #define REGISTERED_WAIT_PREALLOC 2
@@ -33,7 +35,25 @@ namespace neosmart
 	}
 #define Validate(x) ValidateReturn(__FUNCTION__, __LINE__ - 1, x)
 
+	__attribute__((always_inline)) inline uint64_t _rdtsc()
+	{
+		uint32_t a;
+		uint32_t d;
+		asm volatile
+			(".byte 0x0f, 0x31 #rdtsc\n" // edx:eax
+			:"=a"(a), "=d"(d)::);
+		return (((uint64_t) d) << 32) | (uint64_t) a;
+	}
+
 #ifdef WFMO
+	//How many WFMO registered waits to allocate room for on event creation
+	uint64_t insertTime = 0;
+	uint64_t resizeTime = 0;
+	uint64_t removeTime = 0;
+	uint64_t cleanupTime = 0;
+	uint64_t randTime = 0;
+	uint64_t rdtscOverhead = 0;
+
 	//Each call to WaitForMultipleObjects initializes a neosmart_wfmo_t object which tracks
 	//the progress of the caller's multi-object wait and dispatches responses accordingly.
 	//One neosmart_wfmo_t struct is shared for all events in a single WFMO call
@@ -50,6 +70,8 @@ namespace neosmart
 		bool WaitAll;
 	};
 	typedef neosmart_wfmo_t_ *neosmart_wfmo_t;
+
+	uint32_t neosmart_wfmo_t_size = sizeof(neosmart_wfmo_t_);
 #endif
 
 	//The basic event structure, passed to the caller as an opaque pointer when creating events
@@ -59,14 +81,24 @@ namespace neosmart
 		pthread_mutex_t Mutex;
 #ifdef WFMO
 		neosmart_wfmo_t_ **RegisteredWaits; //array of pointers to WFMO/WFSO calls waiting on this event
+		uint32_t HeadOffset;
+		uint32_t TailOffset;
 		uint32_t RegisteredWaitLength;
 #endif
 		bool AutoReset;
 		bool State;
 	};
+	uint32_t neosmart_event_t_size = sizeof(neosmart_wfmo_t_);
 
 	neosmart_event_t CreateEvent(bool initialState, bool manualReset)
 	{
+		//if (rdtscOverhead == 0)
+		{
+			uint64_t rdtsc1 = _rdtsc();
+			uint64_t rdtsc2 = _rdtsc();
+			rdtscOverhead += rdtsc2 - rdtsc1;
+		}
+
 		neosmart_event_t event = (neosmart_event_t) malloc(sizeof(neosmart_event_t_));
 
 		int result = pthread_cond_init(&event->CVariable, 0);
@@ -80,6 +112,8 @@ namespace neosmart
 		//Allocate room for at least one event in our RegisteredWaits "array"
 		event->RegisteredWaitLength = REGISTERED_WAIT_PREALLOC;
 		event->RegisteredWaits = (neosmart_wfmo_t_ **) calloc(event->RegisteredWaitLength, sizeof(neosmart_wfmo_t_*));
+		event->HeadOffset = 0;
+		event->TailOffset = 0;
 #endif
 
 		if (initialState)
@@ -196,27 +230,56 @@ namespace neosmart
 
 	inline void UnlockedEnqueueWait(neosmart_event_t_ *event, neosmart_wfmo_t_ *wait)
 	{
-		for (size_t i = 0; i < event->RegisteredWaitLength; ++i)
+		printf("push in: Wait length: %u, head: %u, tail: %u, head value: %p\n", event->RegisteredWaitLength, event->HeadOffset, event->TailOffset, event->RegisteredWaits[event->HeadOffset]);
+		auto rdtsc = _rdtsc();
+		event->RegisteredWaits[event->TailOffset] = wait;
+		event->TailOffset = (event->TailOffset + 1) % event->RegisteredWaitLength;
+		insertTime += _rdtsc() - rdtsc;
+
+		if (event->TailOffset == event->HeadOffset && event->RegisteredWaits[event->HeadOffset] != nullptr)
+		{
+			printf("RegisteredWaits resize\n");
+			rdtsc = _rdtsc();
+			//resize needed
+			//we don't guarantee order, so we can just set head = 0 and tail = old length - 1 after resize
+			event->RegisteredWaits = (neosmart_wfmo_t_ **) realloc(event->RegisteredWaits, sizeof(neosmart_wfmo_t_ *) * event->RegisteredWaitLength * 2);
+			assert(event->RegisteredWaits != nullptr);
+			event->HeadOffset = 0;
+			event->TailOffset = event->RegisteredWaitLength;
+			event->RegisteredWaitLength *= 2;
+			resizeTime += _rdtsc() - rdtsc;
+			assert(event->RegisteredWaits[event->HeadOffset] != nullptr);
+		}
+
+		assert(event->HeadOffset == event->TailOffset || event->RegisteredWaits[event->HeadOffset] != nullptr);
+		printf("push out: Wait length: %u, head: %u, tail: %u, head value: %p\n", event->RegisteredWaitLength, event->HeadOffset, event->TailOffset, event->RegisteredWaits[event->HeadOffset]);
+		return;
+		/*for (size_t i = 0; i < event->RegisteredWaitLength; ++i)
 		{
 			if (event->RegisteredWaits[i] == nullptr)
 			{
 				event->RegisteredWaits[i] = wait;
+				insertTime += _rdtsc() - rdtsc;
 				return;
 			}
 		}
 
+		rdtsc = _rdtsc();
 		//Not enough room. Need to expand the array of registered waits to fit this wait
 		event->RegisteredWaits = (neosmart_wfmo_t_ **) realloc(event->RegisteredWaits, sizeof(neosmart_wfmo_t_ *) * event->RegisteredWaitLength * 2);
 		assert(event->RegisteredWaits != nullptr);
 		memset(event->RegisteredWaits + event->RegisteredWaitLength, 0, event->RegisteredWaitLength * sizeof(neosmart_wfmo_t_ *)); //zero out the newly-assigned second half of the array
 		event->RegisteredWaits[event->RegisteredWaitLength] = wait;
 		event->RegisteredWaitLength = event->RegisteredWaitLength * 2;
+		resizeTime = _rdtsc() - rdtsc;*/
+		//event->RegisteredWaits->push_back(wait);
+		insertTime += _rdtsc() - rdtsc;
 	}
 
 	inline neosmart_wfmo_t_ *UnlockedDequeueWait(neosmart_event_t_ *event)
 	{
 		//Since order isn't guaranteed, set first to last and last to nullptr
-		neosmart_wfmo_t_ *result = event->RegisteredWaits[0];
+		/*neosmart_wfmo_t_ *result = event->RegisteredWaits[0];
 		event->RegisteredWaits[0] = nullptr; //in case this is the only wait (or the queue is empty)
 		for (size_t i = 1; i < event->RegisteredWaitLength && event->RegisteredWaits[i] != nullptr; ++i)
 		{
@@ -228,11 +291,29 @@ namespace neosmart
 				break;
 			}
 		}
+		removeTime += _rdtsc() - rdtsc;*/
+		printf("pop in: Wait length: %u, head: %u, tail: %u, head value: %p\n", event->RegisteredWaitLength, event->HeadOffset, event->TailOffset, event->RegisteredWaits[event->HeadOffset]);
+		auto rdtsc = _rdtsc();
+		neosmart_wfmo_t_ *result;
+		uint32_t newHead = (event->HeadOffset + 1) % event->RegisteredWaitLength;
+		if (event->HeadOffset == event->TailOffset)
+		{
+			//already empty, we would underflow
+			result = nullptr;
+		}
+		else
+		{
+			result = event->RegisteredWaits[event->HeadOffset];
+			event->HeadOffset = newHead;
+		}
+		removeTime += _rdtsc() - rdtsc;
+		printf("pop out: Wait length: %u, head: %u, tail: %u, head value: %p\n", event->RegisteredWaitLength, event->HeadOffset, event->TailOffset, event->RegisteredWaits[event->HeadOffset]);
 		return result;
 	}
 
 	int WaitForMultipleEvents(neosmart_event_t *events, uint32_t count, bool waitAll, uint64_t milliseconds, uint32_t *waitIndex)
 	{
+		fast_srand(time(nullptr));
 		uint32_t waitIndexResult = -1u;
 		neosmart_wfmo_t_ *wfmo = (neosmart_wfmo_t_ *)malloc(sizeof(neosmart_wfmo_t_));
 
@@ -255,7 +336,7 @@ namespace neosmart
 		Validate(tempResult);
 
 		bool done = false;
-		for (size_t i = 0; i < count; ++i)
+		for (uint32_t i = 0; i < count; ++i)
 		{
 			//Must not release lock until RegisteredWait is potentially added
 			tempResult = pthread_mutex_lock(&events[i]->Mutex);
@@ -283,9 +364,46 @@ namespace neosmart
 			else
 			{
 				++wfmo->ReferenceCount;
-				UnlockedEnqueueWait(events[i], wfmo);
+				//UnlockedEnqueueWait(events[i], wfmo);
 
-				tempResult = pthread_mutex_unlock(&events[i]->Mutex);
+				//try cleaning up a "random" wait
+				//number of entries in a buffer:
+				//two cases: tail < head and tail <= head
+				//case 1: eg head = 2, tail = 4, length = 7 -> count = ((tail + length) - head) % length = 2 (which is correct; inclusive indices 2-3)
+				//case 2: eg tail = 2, head = 4, length = 7 -> count = (tail + length) - head = 5 (which is correct; inclusive indices 4-6 and 0-1)
+				//both of which are covered by formula for case 1
+				uint64_t rdtsc = _rdtsc();
+				auto event = events[i];
+				if (event->HeadOffset != event->TailOffset)
+				{
+					//randTime -= (_rdtsc() - rdtsc);
+					/*uint32_t count = ((event->TailOffset + event->RegisteredWaitLength) - event->HeadOffset) % event->RegisteredWaitLength;
+					neosmart_wfmo_t_ **wRand = event->RegisteredWaits + (event->HeadOffset + ((event->TailOffset ^ event->HeadOffset) % count)) % event->RegisteredWaitLength;
+					randTime += _rdtsc() - rdtsc;*/
+					neosmart_wfmo_t_ **wRand = event->RegisteredWaits + (event->TailOffset - 1) % event->RegisteredWaitLength;
+					//if (!(*wRand)->WaitAll && (*wRand)->Status.FiredEvent != nullptr)
+					{
+						//this wait has been fulfilled
+						tempResult = pthread_mutex_trylock(&(*wRand)->Mutex);
+						if (tempResult == 0)
+						{
+							//double-checked locking
+							if (!(*wRand)->WaitAll && (*wRand)->Status.FiredEvent != nullptr)
+							{
+								//printf("Replacing existing\n");
+								UnlockWfmo(*wRand);
+								//and put ours in its place
+								*wRand = wfmo;
+								goto addComplete;
+							}
+						}
+					}
+				}
+				//printf("Adding new\n");
+				UnlockedEnqueueWait(event, wfmo);
+addComplete:
+				cleanupTime += _rdtsc() - rdtsc;
+				tempResult = pthread_mutex_unlock(&event->Mutex);
 				Validate(tempResult);
 			}
 		}
@@ -341,7 +459,6 @@ namespace neosmart
 		//If we terminated early (during wait registration), the waitIndex is already determined
 		if (waitIndex != nullptr)
 		{
-			*waitIndex = waitIndexResult;
 			if (waitIndexResult == -1u)
 			{
 				for (uint32_t i = 0; i < count; ++i)
@@ -353,7 +470,43 @@ namespace neosmart
 					}
 				}
 			}
+			else
+			{
+				*waitIndex = waitIndexResult;
+			}
 		}
+
+#if false
+		//Early cleanup? 
+		for (neosmart_event_t_ *event = events; event - events < count; ++event)
+		{
+			tempResult = pthread_mutex_trylock(&event->Mutex);
+			if (tempResult != 0)
+			{
+				//don't waste time
+				continue;
+			}
+			uint32_t headOffset = event->HeadOffset;
+			for (neosmart_wfmo_t_ **oldWfmo = event->RegisteredWaits + headOffset; headOffset != event->TailOffset; oldWfmo = event->RegisteredWaits + (headOffset = (headOffset + 1) % event->RegisteredWaitLength))
+			{
+				//this is safe to read without locking because 
+				//a) we have the event mutex which means it can't be deleted
+				//b) it's <= 32 bytes, which means it can be read atomically
+				//c) we'll double-check the results after obtaining the lock if we care about the result (no we won't, because WaitAll never changes!)
+				if (!oldWfmo->WaitAll)
+				{
+					//we can skip anything that's WaitAll, since that's guaranteed to clean up immediately
+					tempResult = pthread_mutex_trylock(&oldWfmo->Mutex);
+					if (tempResult != 0)
+					{
+						//don't waste time
+						continue;
+					}
+					if (oldWfmo)
+				}
+			}
+		}
+#endif
 
 		//Done. Release resources and get out of here.
 		UnlockWfmo(wfmo);
@@ -368,10 +521,10 @@ namespace neosmart
 		int result = 0;
 
 #ifdef WFMO
-		//printf("RegisteredWaitLength: %d\n", event->RegisteredWaitLength);
 		result = pthread_mutex_lock(&event->Mutex);
 		Validate(result);
 		free(event->RegisteredWaits);
+		//delete(event->RegisteredWaits);
 		result = pthread_mutex_unlock(&event->Mutex);
 		Validate(result);
 #endif
@@ -382,7 +535,7 @@ namespace neosmart
 		result = pthread_mutex_destroy(&event->Mutex);
 		Validate(result);
 
-		delete event;
+		free(event);
 
 		return 0;
 	}
@@ -428,16 +581,17 @@ namespace neosmart
 					signal = true; //see branching vs context switch question below
 				}
 
-				//Done. Release resources and get out of here.
-				UnlockWfmo(wfmo);
 				//I'm not sure what's cheaper: a branch or an unnecessary kernel context switch
 				//assuming branching for now... otherwise we'd signal unconditionally
 				if (signal)
 				{
-					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
+					//it's not safe to do this after unlocking the WFMO because it can be deleted in the time in between
 					result = pthread_cond_signal(&wfmo->CVariable);
 					Validate(result);
 				}
+
+				//Done. Release resources and get out of here.
+				UnlockWfmo(wfmo);
 
 				//if the wfmo was already fulfilled, state will still be true
 				//try again, if possible (this could go in the while precondition, but this is saner for code review)
@@ -461,8 +615,14 @@ namespace neosmart
 		else
 		{
 #ifdef WFMO
-			for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits; *wfmo != nullptr; ++wfmo)
+			//for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits; *wfmo != nullptr; ++wfmo)
+			//for (auto i = 0; i < event->RegisteredWaits->size(); ++i)
+			uint32_t headOffset = event->HeadOffset;
+			printf("Wait length: %u, head: %u, tail: %u, head value: %p\n", event->RegisteredWaitLength, event->HeadOffset, event->TailOffset, event->RegisteredWaits[event->HeadOffset]);
+			for (neosmart_wfmo_t_ **wfmo = event->RegisteredWaits + headOffset; headOffset != event->TailOffset; wfmo = event->RegisteredWaits + (headOffset = (headOffset + 1) % event->RegisteredWaitLength))
 			{
+				//neosmart_wfmo_t_ *temp = event->RegisteredWaits->at(i);
+				//neosmart_wfmo_t_ **wfmo = &temp;
 				result = pthread_mutex_lock(&(*wfmo)->Mutex);
 				Validate(result);
 
@@ -478,18 +638,22 @@ namespace neosmart
 					(*wfmo)->Status.FiredEvent = event;
 				}
 
-				UnlockWfmo(*wfmo);
 				//I'm not sure what's cheaper: a branch or an unnecessary kernel context switch
 				//assuming branching for now... otherwise we'd signal unconditionally
 				if (signal)
 				{
-					//by necessity, a need to signal a wfmo CV means refcount wasn't zero and wfmo isn't freed by unlock above
+					//it's not safe to do this after unlocking the WFMO because it can be deleted in the time in between
 					result = pthread_cond_signal(&(*wfmo)->CVariable);
 					Validate(result);
 				}
+
+				UnlockWfmo(*wfmo);
 			}
 			//clear all waits
 			memset(event->RegisteredWaits, 0, event->RegisteredWaitLength * sizeof(neosmart_wfmo_t_*));
+			event->HeadOffset = 0;
+			event->TailOffset = 0;
+			//event->RegisteredWaits->clear();
 #endif
 			result = pthread_mutex_unlock(&event->Mutex);
 			Validate(result);
