@@ -82,15 +82,13 @@ namespace neosmart
 		{
 			--wait.Waiter->RefCount;
 			assert(wait.Waiter->RefCount >= 0);
-			if (wait.Waiter->RefCount == 0)
+			bool destroy = wait.Waiter->RefCount == 0;
+			result = pthread_mutex_unlock(&wait.Waiter->Mutex);
+			assert(result == 0);
+			if (destroy)
 			{
 				wait.Waiter->Destroy();
 				delete wait.Waiter;
-			}
-			else
-			{
-				result = pthread_mutex_unlock(&wait.Waiter->Mutex);
-				assert(result == 0);
 			}
 
 			return true;
@@ -338,15 +336,13 @@ namespace neosmart
 
 		--wfmo->RefCount;
 		assert(wfmo->RefCount >= 0);
-		if (wfmo->RefCount == 0)
+		bool destroy = wfmo->RefCount == 0;
+		tempResult = pthread_mutex_unlock(&wfmo->Mutex);
+		assert(tempResult == 0);
+		if (destroy)
 		{
 			wfmo->Destroy();
 			delete wfmo;
-		}
-		else
-		{
-			tempResult = pthread_mutex_unlock(&wfmo->Mutex);
-			assert(tempResult == 0);
 		}
 
 		return result;
@@ -398,15 +394,13 @@ namespace neosmart
 				assert(i->Waiter->RefCount >= 0);
 				if (!i->Waiter->StillWaiting)
 				{
-					if (i->Waiter->RefCount == 0)
+					bool destroy = i->Waiter->RefCount == 0;
+					result = pthread_mutex_unlock(&i->Waiter->Mutex);
+					assert(result == 0);
+					if (destroy)
 					{
 						i->Waiter->Destroy();
 						delete i->Waiter;
-					}
-					else
-					{
-						result = pthread_mutex_unlock(&i->Waiter->Mutex);
-						assert(result == 0);
 					}
 					event->RegisteredWaits.pop_front();
 					continue;
@@ -469,15 +463,13 @@ namespace neosmart
 
 				if (!info->Waiter->StillWaiting)
 				{
-					if (info->Waiter->RefCount == 0)
+					bool destroy = info->Waiter->RefCount == 0;
+					result = pthread_mutex_unlock(&info->Waiter->Mutex);
+					assert(result == 0);
+					if (destroy)
 					{
 						info->Waiter->Destroy();
 						delete info->Waiter;
-					}
-					else
-					{
-						result = pthread_mutex_unlock(&info->Waiter->Mutex);
-						assert(result == 0);
 					}
 					continue;
 				}
