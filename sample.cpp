@@ -84,9 +84,9 @@ int main()
 {
 	events[0] = CreateEvent(); //letter available auto-reset event, initially unavailable
 	events[1] = CreateEvent(); //number available auto-reset event, initially unavailable
-	events[2] = CreateEvent(false, true); //abort manual-reset event
-	events[3] = CreateEvent(true); //letter protection auto-reset event (instead of a mutex), initially available
-	events[4] = CreateEvent(true); //number protection auto-reset event (instead of a mutex), initially available
+	events[2] = CreateEvent(true, false); //abort manual-reset event
+	events[3] = CreateEvent(false, true); //letter protection auto-reset event (instead of a mutex), initially available
+	events[4] = CreateEvent(false, true); //number protection auto-reset event (instead of a mutex), initially available
 
 	//after the abort event has been created
 	struct sigaction act = {0};
