@@ -40,7 +40,7 @@ namespace neosmart
 			uint64_t rounds = milliseconds / waitUnit;
 			uint32_t remainder = milliseconds % waitUnit;
 
-			uint32_t result = WaitForSingleObject(handle, remainder);
+			result = WaitForSingleObject(handle, remainder);
 			while (result == WAIT_TIMEOUT && rounds-- != 0)
 			{
 				result = WaitForSingleObject(handle, waitUnit);
