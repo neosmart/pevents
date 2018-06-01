@@ -1,0 +1,4 @@
+option('wfmo', type: 'boolean', value: true,
+	description: 'Enable WFMO events')
+option('pulse', type: 'boolean', value: false,
+	description: 'Enable PulseEvent() function')

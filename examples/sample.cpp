@@ -24,7 +24,7 @@ using namespace std;
 neosmart_event_t events[5]; //letters, numbers, abort, letterSync, numberSync
 std::atomic<bool> interrupted { false }; //for signal handling
 
-//by leaving these originally unassigned, any access to unitialized memory 
+//by leaving these originally unassigned, any access to unitialized memory
 //will be flagged by valgrind
 char letter;
 int number;
@@ -89,7 +89,7 @@ int main()
 	events[4] = CreateEvent(false, true); //number protection auto-reset event (instead of a mutex), initially available
 
 	//after the abort event has been created
-	struct sigaction act = {0};
+	struct sigaction act {};
 	act.sa_handler = intHandler; //trigger abort on ctrl+c
 	sigaction(SIGINT, &act, NULL);
 
@@ -110,10 +110,10 @@ int main()
 	{
 		threads.emplace_back(numbers);
 	}
-	
+
 	printf("Started %u letter threads\n", letterThreadCount);
 	printf("Started %u number threads\n", numberThreadCount);
-	
+
 	for (uint32_t i = 0; lastChar != 'Z'; ++i)
 	{
 		if (interrupted)
@@ -158,7 +158,7 @@ int main()
 		}
 	}
 
-	//You can't just DestroyEvent() and exit - it'll segfault 
+	//You can't just DestroyEvent() and exit - it'll segfault
 	//That's because letters() and numbers() will call SetEvent on a destroyed event
 	//You must *never* call SetEvent/ResetEvent on a destroyed event!
 	//So we set an abort event and wait for the helper threads to exit
@@ -170,7 +170,7 @@ int main()
 	{
 		thread.join();
 	}
-	
+
 	for (auto event : events)
 	{
 		DestroyEvent(event);
