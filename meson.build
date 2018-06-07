@@ -13,7 +13,8 @@ incdir = include_directories('src/')
 
 srcs = ['src/pevents.cpp',
 	'src/win32.cpp']
-pevents = library('pevents', srcs,
+# pevents = both_libraries('pevents', srcs,
+pevents = static_library('pevents', srcs,
 	cpp_args: args,
 	dependencies: [pthreads])
 

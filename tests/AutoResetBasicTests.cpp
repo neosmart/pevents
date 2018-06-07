@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #include <pevents.h>
 #include <thread>
 #include <iostream>
@@ -20,12 +23,13 @@ int main(int argc, const char *argv[]) {
 	auto result = WaitForEvent(event, 0);
 	if (result != 0) {
 		std::cout << "Initial WaitForEvent on autoreset event failed!" << std::endl;
-		return ETIMEDOUT;
+		return WAIT_TIMEOUT;
 	}
 
 	result = WaitForEvent(event, 0);
-	if (result != ETIMEDOUT) {
+	if (result != WAIT_TIMEOUT) {
 		std::cout << "Second WaitForEvent on autoreset event succeeded!" << std::endl;
+		std::cout << "Result was " << result << std::endl;
 		return 1;
 	}
 
@@ -46,7 +50,7 @@ int main(int argc, const char *argv[]) {
 
 	if (result != 0) {
 		std::cout << "Timeout waiting for t1_finished!" << std::endl;
-		return ETIMEDOUT;
+		return WAIT_TIMEOUT;
 	}
 
 	return 0;

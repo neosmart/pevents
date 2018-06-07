@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #include <pevents.h>
 #include <thread>
 #include <iostream>
@@ -33,7 +36,7 @@ int main(int argc, const char *argv[]) {
 
 	if (result != 0) {
 		std::cout << "Timeout waiting for t1_finished!" << std::endl;
-		return ETIMEDOUT;
+		return WAIT_TIMEOUT;
 	}
 
 	return 0;

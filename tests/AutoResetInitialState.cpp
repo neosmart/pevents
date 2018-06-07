@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #include <pevents.h>
 #include <iostream>
 
@@ -12,7 +15,7 @@ bool InitiallySet() {
 bool InitiallyUnset() {
 	auto event = CreateEvent(false, false);
 	auto result = WaitForEvent(event, 0);
-	return result == ETIMEDOUT;
+	return result == WAIT_TIMEOUT;
 }
 
 int main(int argc, const char *argv[]) {

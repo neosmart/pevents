@@ -88,10 +88,14 @@ int main()
 	events[3] = CreateEvent(false, true); //letter protection auto-reset event (instead of a mutex), initially available
 	events[4] = CreateEvent(false, true); //number protection auto-reset event (instead of a mutex), initially available
 
+#if !defined(_WIN32)
 	//after the abort event has been created
 	struct sigaction act {};
 	act.sa_handler = intHandler; //trigger abort on ctrl+c
 	sigaction(SIGINT, &act, NULL);
+#else
+	SetConsoleCtrlHandler((PHANDLER_ROUTINE) intHandler, true);
+#endif
 
 	vector<std::thread> threads;
 
