@@ -11,8 +11,7 @@ endif
 pthreads = dependency('threads')
 incdir = include_directories('src/')
 
-srcs = ['src/pevents.cpp',
-	'src/win32.cpp']
+srcs = ['src/pevents.cpp']
 # pevents = both_libraries('pevents', srcs,
 pevents = static_library('pevents', srcs,
 	cpp_args: args,

@@ -83,8 +83,7 @@ int PulseEvent(neosmart_event_t event);
 
 All the code is contained within `pevents.cpp` and `pevents.h`. You should
 include these two files in your project as needed. All functions are in
-the `neosmart` namespace. (Windows users should use `win32.cpp` instead of
-`pevents.cpp`)
+the `neosmart` namespace.
 
 ### Code structure
 
