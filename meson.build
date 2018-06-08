@@ -26,6 +26,15 @@ basic_tests = ['ManualResetInitialState',
 # tests that required wfmo
 wfmo_tests = []
 
+# single file include
+custom_target('pevents.hpp',
+	build_by_default: true,
+	command: ['sed', '/#include "pevents.h"/d', '@INPUT@'],
+	capture: true,
+	input: ['src/pevents.h', srcs],
+	output: 'pevents.hpp'
+  )
+
 sample = executable('sample', ['examples/sample.cpp'],
 	include_directories: incdir,
 	cpp_args: args,
