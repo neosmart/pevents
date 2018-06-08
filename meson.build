@@ -44,6 +44,8 @@ endif
 
 foreach test : tests
 	exe = executable(test, ['tests/' + test + '.cpp'],
+		# build_by_default is currently broken for tests
+		# See https://github.com/mesonbuild/meson/issues/3662
 		build_by_default: false,
 		include_directories: incdir,
 		link_with: pevents,
