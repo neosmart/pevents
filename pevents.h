@@ -1,7 +1,7 @@
 /*
  * WIN32 Events for POSIX
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
- * Copyright (C) 2011 - 2015 by NeoSmart Technologies
+ * Copyright (C) 2011 - 2018 by NeoSmart Technologies
  * This code is released under the terms of the MIT License
 */
 
@@ -22,7 +22,7 @@ namespace neosmart
 	//Type declarations
 	struct neosmart_event_t_;
 	typedef neosmart_event_t_ * neosmart_event_t;
-	
+
 	//WIN32-style functions
 	neosmart_event_t CreateEvent(bool manualReset = false, bool initialState = false);
 	int DestroyEvent(neosmart_event_t event);
@@ -36,7 +36,7 @@ namespace neosmart
 #ifdef PULSE
 	int PulseEvent(neosmart_event_t event);
 #endif
-    
+
 	//POSIX-style functions
 	//TBD
 }

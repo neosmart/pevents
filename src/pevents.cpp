@@ -1,7 +1,7 @@
 /*
  * WIN32 Events for POSIX
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
- * Copyright (C) 2011 - 2015 by NeoSmart Technologies
+ * Copyright (C) 2011 - 2018 by NeoSmart Technologies
  * This code is released under the terms of the MIT License
 */
 
@@ -523,11 +523,11 @@ namespace neosmart
 	int PulseEvent(neosmart_event_t event)
 	{
 		//This may look like it's a horribly inefficient kludge with the sole intention of reducing code duplication,
-		//but in reality this is what any PulseEvent() implementation must look like. The only overhead (function 
+		//but in reality this is what any PulseEvent() implementation must look like. The only overhead (function
 		//calls aside, which your compiler will likely optimize away, anyway), is if only WFMO auto-reset waits are active
-		//there will be overhead to unnecessarily obtain the event mutex for ResetEvent() after. In all other cases (being 
+		//there will be overhead to unnecessarily obtain the event mutex for ResetEvent() after. In all other cases (being
 		//no pending waits, WFMO manual-reset waits, or any WFSO waits), the event mutex must first be released for the
-		//waiting thread to resume action prior to locking the mutex again in order to set the event state to unsignaled, 
+		//waiting thread to resume action prior to locking the mutex again in order to set the event state to unsignaled,
 		//or else the waiting threads will loop back into a wait (due to checks for spurious CVariable wakeups).
 
 		int result = SetEvent(event);
