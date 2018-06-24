@@ -17,6 +17,10 @@ pevents = static_library('pevents', srcs,
 	cpp_args: args,
 	dependencies: [pthreads])
 
+pevents = declare_dependency(include_directories: include_directories('.'),
+	link_with: pevents,
+	dependencies: [pthreads])
+
 # tests that don't required wfmo
 basic_tests = ['ManualResetInitialState',
 		'AutoResetInitialState',
@@ -38,8 +42,7 @@ custom_target('pevents.hpp',
 sample = executable('sample', ['examples/sample.cpp'],
 	include_directories: incdir,
 	cpp_args: args,
-	link_with: pevents,
-	dependencies: pthreads)
+	dependencies: [pevents])
 
 tests = []
 foreach test : basic_tests
@@ -57,8 +60,7 @@ foreach test : tests
 		# See https://github.com/mesonbuild/meson/issues/3662
 		build_by_default: false,
 		include_directories: incdir,
-		link_with: pevents,
-		dependencies: pthreads)
+		dependencies: pevents)
 	test(test, exe)
 endforeach
 
