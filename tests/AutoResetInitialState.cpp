@@ -23,7 +23,7 @@ int main(int argc, const char *argv[]) {
 		std::cout << "InitiallySet test failed!" << std::endl;
 		return 1;
 	}
-	if (!InitiallySet()) {
+	if (!InitiallyUnset()) {
 		std::cout << "InitiallyUnset test failed!" << std::endl;
 		return 1;
 	}
