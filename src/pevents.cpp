@@ -285,6 +285,14 @@ namespace neosmart
 			}
 		}
 
+		// We set the `done` flag above in case of WaitAny and at least one event was set.
+		// But we need to check again here if we were doing a WaitAll or else we'll incorrectly
+		// return WAIT_TIMEOUT.
+		if (wfmo->Status.EventsLeft == 0)
+		{
+			done = true;
+		}
+
 		timespec ts;
 		if (!done)
 		{
