@@ -28,7 +28,9 @@ basic_tests = ['ManualResetInitialState',
 		'AutoResetBasicTests',
 	]
 # tests that required wfmo
-wfmo_tests = []
+wfmo_tests = [
+    'WaitTimeoutAllSignalled',
+  ]
 
 # single file include
 custom_target('pevents.hpp',
@@ -45,10 +47,12 @@ sample = executable('sample', ['examples/sample.cpp'],
 	dependencies: [pevents])
 
 tests = []
+test_args = []
 foreach test : basic_tests
   tests += test
 endforeach
 if get_option('wfmo')
+  test_args += '-DWFMO'
   foreach test : wfmo_tests
 	tests += test
   endforeach
@@ -59,6 +63,7 @@ foreach test : tests
 		# build_by_default is currently broken for tests
 		# See https://github.com/mesonbuild/meson/issues/3662
 		build_by_default: false,
+		cpp_args: test_args,
 		include_directories: incdir,
 		dependencies: pevents)
 	test(test, exe)
