@@ -25,7 +25,7 @@ namespace neosmart {
     // Function declarations
     neosmart_event_t CreateEvent(bool manualReset = false, bool initialState = false);
     int DestroyEvent(neosmart_event_t event);
-    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds = -1);
+    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds = -1ul);
     int SetEvent(neosmart_event_t event);
     int ResetEvent(neosmart_event_t event);
 #ifdef WFMO

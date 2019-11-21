@@ -120,7 +120,7 @@ namespace neosmart {
             }
 
             timespec ts;
-            if (milliseconds != (uint64_t)-1) {
+            if (milliseconds != -1ul) {
                 timeval tv;
                 gettimeofday(&tv, NULL);
 
@@ -128,13 +128,13 @@ namespace neosmart {
                                        milliseconds * 1000 * 1000 + ((uint64_t)tv.tv_usec) * 1000;
 
                 ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
-                ts.tv_nsec = (nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
+                ts.tv_nsec = (long) (nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
             }
 
             do {
                 // Regardless of whether it's an auto-reset or manual-reset event:
                 // wait to obtain the event, then lock anyone else out
-                if (milliseconds != (uint64_t)-1) {
+                if (milliseconds != -1ul) {
                     result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
                 } else {
                     result = pthread_cond_wait(&event->CVariable, &event->Mutex);
@@ -264,7 +264,7 @@ namespace neosmart {
             if (milliseconds == 0) {
                 result = WAIT_TIMEOUT;
                 done = true;
-            } else if (milliseconds != (uint64_t)-1) {
+            } else if (milliseconds != -1ul) {
                 timeval tv;
                 gettimeofday(&tv, NULL);
 
@@ -272,7 +272,7 @@ namespace neosmart {
                                        milliseconds * 1000 * 1000 + ((uint64_t)tv.tv_usec) * 1000;
 
                 ts.tv_sec = nanoseconds / 1000 / 1000 / 1000;
-                ts.tv_nsec = (nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
+                ts.tv_nsec = (long) (nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
             }
         }
 
@@ -286,7 +286,7 @@ namespace neosmart {
                    (!waitAll && wfmo->Status.FiredEvent != -1);
 
             if (!done) {
-                if (milliseconds != (uint64_t)-1) {
+                if (milliseconds != -1ul) {
                     result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
                 } else {
                     result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
@@ -513,7 +513,7 @@ namespace neosmart {
         HANDLE handle = static_cast<HANDLE>(event);
 
         // WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
-        if (milliseconds == ((uint64_t)-1) || (milliseconds >> 32) == 0) {
+        if (milliseconds == -1ul || (milliseconds >> 32) == 0) {
             result = WaitForSingleObject(handle, static_cast<uint32_t>(milliseconds));
         } else {
             // Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
@@ -562,7 +562,7 @@ namespace neosmart {
         uint32_t result = 0;
 
         // WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
-        if (milliseconds == ((uint64_t)-1) || (milliseconds >> 32) == 0) {
+        if (milliseconds == -1ul || (milliseconds >> 32) == 0) {
             result = WaitForMultipleObjects(count, handles, waitAll,
                                             static_cast<uint32_t>(milliseconds));
         } else {
