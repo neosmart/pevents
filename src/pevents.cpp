@@ -61,7 +61,7 @@ namespace neosmart {
     };
 
 #ifdef WFMO
-    bool RemoveExpiredWaitHelper(neosmart_wfmo_info_t_ wait) {
+    static bool RemoveExpiredWaitHelper(neosmart_wfmo_info_t_ wait) {
         int result = pthread_mutex_trylock(&wait.Waiter->Mutex);
 
         if (result == EBUSY) {
@@ -111,7 +111,7 @@ namespace neosmart {
         return event;
     }
 
-    int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
+    static int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
         int result = 0;
         if (!event->State) {
             // Zero-timeout event state check optimization
