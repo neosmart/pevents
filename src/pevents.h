@@ -22,10 +22,13 @@ namespace neosmart {
     struct neosmart_event_t_;
     typedef neosmart_event_t_ *neosmart_event_t;
 
+    // Constant declarations
+    constexpr uint64_t INFINITE_WAIT = ~((unsigned long long)0);
+
     // Function declarations
     neosmart_event_t CreateEvent(bool manualReset = false, bool initialState = false);
     int DestroyEvent(neosmart_event_t event);
-    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds = UINT64_MAX);
+    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds = INFINITE_WAIT);
     int SetEvent(neosmart_event_t event);
     int ResetEvent(neosmart_event_t event);
 #ifdef WFMO
