@@ -22,18 +22,18 @@ pevents = declare_dependency(include_directories: include_directories('.'),
 	link_with: pevents,
 	dependencies: [pthreads])
 
-# tests that don't required wfmo
+# Tests that don't required wfmo
 basic_tests = ['ManualResetInitialState',
 		'AutoResetInitialState',
 		'ManualResetBasicTests',
 		'AutoResetBasicTests',
 	]
-# tests that required wfmo
+# Tests that required wfmo
 wfmo_tests = [
     'WaitTimeoutAllSignalled',
   ]
 
-# single file include
+# Single file include
 custom_target('pevents.hpp',
 	build_by_default: true,
 	command: ['sed', '/#include "pevents.h"/d', '@INPUT@'],
@@ -42,9 +42,11 @@ custom_target('pevents.hpp',
 	output: 'pevents.hpp'
   )
 
+# Sample program demonstrating capabilities
 sample = executable('sample', ['examples/sample.cpp'],
 	include_directories: incdir,
 	cpp_args: args,
+       override_options: ['cpp_std=c++11'],
 	dependencies: [pevents])
 
 tests = []
@@ -65,6 +67,7 @@ foreach test : tests
 		# See https://github.com/mesonbuild/meson/issues/3662
 		build_by_default: false,
 		cpp_args: test_args,
+               override_options: ['cpp_std=c++11'],
 		include_directories: incdir,
 		dependencies: pevents)
 	test(test, exe)
