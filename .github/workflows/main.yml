@@ -1,0 +1,60 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          sudo apt install meson ninja-build
+
+      - name: meson build
+        run: |
+          meson build
+
+      - name: ninja
+        run: |
+          ninja -C build
+
+      - name: ninja test
+        run: |
+          ninja -C build test
+
+  macOS:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          brew install python3 ninja
+          sudo pip3 install meson
+
+      - name: meson build
+        run: |
+          meson setup build
+
+      - name: ninja
+        run: |
+          meson compile -C build
+
+      - name: ninja test
+        run: |
+          meson test -C build
