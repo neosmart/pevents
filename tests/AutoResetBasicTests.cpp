@@ -7,9 +7,9 @@
 
 using namespace neosmart;
 
-neosmart_event_t event;
-neosmart_event_t t1_started;
-neosmart_event_t t1_finished;
+pthread_event_t event;
+pthread_event_t t1_started;
+pthread_event_t t1_finished;
 
 void worker() {
     WaitForEvent(event, 0);
