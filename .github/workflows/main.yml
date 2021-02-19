@@ -44,12 +44,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install python3
+          brew install python3 ninja
           sudo pip3 install meson
 
       - name: meson build
         run: |
-          meson setup --backend xcode build
+          meson setup build
 
       - name: ninja
         run: |
