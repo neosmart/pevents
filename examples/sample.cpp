@@ -1,8 +1,8 @@
 /*
  * WIN32 Events for POSIX
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
- * Copyright (C) 2011 - 2018 by NeoSmart Technologies
- * This code is released under the terms of the MIT License
+ * Copyright (C) 2011 - 2021 by NeoSmart Technologies
+ * This code is released under the terms of the MIT License.
  */
 
 #include <assert.h>
@@ -12,7 +12,8 @@
 #include <random>
 #include <signal.h>
 #include <thread>
-// On Windows, you must include Winbase.h/Synchapi.h/Windows.h before pevents.h
+
+// NB: On Windows, you must include Winbase.h/Synchapi.h/Windows.h before pevents.h
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -24,20 +25,20 @@ using namespace std;
 neosmart_event_t events[5];           // letters, numbers, abort, letterSync, numberSync
 std::atomic<bool> interrupted{false}; // for signal handling
 
-// by leaving these originally unassigned, any access to unitialized memory
-// will be flagged by valgrind
+// By leaving these originally unassigned, any access to unitialized memory
+// will be flagged by valgrind.
 char letter;
 int number;
 
 char lastChar = '\0';
 int lastNum = -1;
 
-void intHandler(int sig) {
+void intHandler(__attribute__((unused)) int sig) {
+    // Unfortunately you can't use SetEvent here because posix signal handlers
+    // shouldn't use any non-reentrant code (like printf).
+    // On x86/x64, std::atomic<bool> is just a fancy way of doing a memory
+    // barrier and nothing more, so it is safe.
     interrupted = true;
-    // unfortunately you can't use SetEvent here because posix signal handlers
-    // shouldn't use any non-reentrant code (like printf)
-    // on x86/x64, std::atomic<bool> is just a fancy way of doing a memory
-    // barrier and nothing more, so it is safe
 }
 
 void letters() {
@@ -46,16 +47,17 @@ void letters() {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dis(0, 3000);
 
-    // wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
+    // Wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
     while (WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT) {
-        // remember that another instance of this function may be executing concurrently, so after
+        // Remember that another instance of this function may be executing concurrently, so after
         // the sleep finishes, make sure to obtain exclusive access by means of this auto-reset
-        // event
+        // event.
         auto waitResult = WaitForEvent(events[3]); // only one thread here at a time
         assert(waitResult == 0);
         letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[letterIndex % 26];
         ++letterIndex;
-        SetEvent(events[0]); // signal main thread to print generated letter
+        // Signal the main thread to print generated letter
+        SetEvent(events[0]);
     }
 }
 
@@ -65,16 +67,17 @@ void numbers() {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dis(0, 3000);
 
-    // wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
+    // Wait a random amount of time, from 0 through 3000 milliseconds, between each print attempt
     while (WaitForEvent(events[2], dis(gen)) == WAIT_TIMEOUT) {
-        // remember that another instance of this function may be executing concurrently, so after
+        // Remember that another instance of this function may be executing concurrently, so after
         // the sleep finishes, make sure to obtain exclusive access by means of this auto-reset
-        // event
+        // event.
         auto waitResult = WaitForEvent(events[4]); // only one thread here at a time
         assert(waitResult == 0);
         number = numberIndex;
         ++numberIndex;
-        SetEvent(events[1]); // signal main thread to print generated number
+        // Signal the main thread to print generated number
+        SetEvent(events[1]);
     }
 }
 
@@ -90,7 +93,7 @@ int main() {
         true); // number protection auto-reset event (instead of a mutex), initially available
 
 #if !defined(_WIN32)
-    // after the abort event has been created
+    // After the abort event has been created:
     struct sigaction act {};
     act.sa_handler = intHandler; // trigger abort on ctrl+c
     sigaction(SIGINT, &act, NULL);
@@ -137,7 +140,8 @@ int main() {
             assert(letter == 'A' || (lastChar + 1) == letter);
             cout << letter << endl;
             lastChar = letter;
-            SetEvent(events[3]); // safe for another thread to enter this loop
+            // Declare it is safe for another thread to enter this loop
+            SetEvent(events[3]);
         } else if (index == 1) {
             // printf("lastNum: %d, num: %d\n", lastNum, number);
             assert(number == 0 || lastNum + 1 == number);
@@ -150,18 +154,19 @@ int main() {
         }
     }
 
-    // You can't just DestroyEvent() and exit - it'll segfault
-    // That's because letters() and numbers() will call SetEvent on a destroyed event
-    // You must *never* call SetEvent/ResetEvent on a destroyed event!
-    // So we set an abort event and wait for the helper threads to exit
+    // You can't just DestroyEvent() and exit - it'll segfault because `letters()` and `numbers()`
+    // will end up calling `SetEvent()` on a destroyed event.
+    // You must *never* call `SetEvent`/`ResetEvent` on a destroyed event, so we set an abort event
+    // and wait for the helper threads to exit.
 
-    // Set the abort
+    // Signal the abort
     SetEvent(events[2]);
 
     for (auto &thread : threads) {
         thread.join();
     }
 
+    // Only after we've guaranteed that all usage of the events has ceased:
     for (auto event : events) {
         DestroyEvent(event);
     }
