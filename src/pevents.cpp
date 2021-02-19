@@ -120,7 +120,7 @@ namespace neosmart {
             }
 
             timespec ts;
-            if (milliseconds != INFINITE_WAIT) {
+            if (milliseconds != WAIT_INFINITE) {
                 timeval tv;
                 gettimeofday(&tv, NULL);
 
@@ -134,7 +134,7 @@ namespace neosmart {
             do {
                 // Regardless of whether it's an auto-reset or manual-reset event:
                 // wait to obtain the event, then lock anyone else out
-                if (milliseconds != INFINITE_WAIT) {
+                if (milliseconds != WAIT_INFINITE) {
                     result = pthread_cond_timedwait(&event->CVariable, &event->Mutex, &ts);
                 } else {
                     result = pthread_cond_wait(&event->CVariable, &event->Mutex);
@@ -264,7 +264,7 @@ namespace neosmart {
             if (milliseconds == 0) {
                 result = WAIT_TIMEOUT;
                 done = true;
-            } else if (milliseconds != INFINITE_WAIT) {
+            } else if (milliseconds != WAIT_INFINITE) {
                 timeval tv;
                 gettimeofday(&tv, NULL);
 
@@ -286,7 +286,7 @@ namespace neosmart {
                    (!waitAll && wfmo->Status.FiredEvent != -1);
 
             if (!done) {
-                if (milliseconds != INFINITE_WAIT) {
+                if (milliseconds != WAIT_INFINITE) {
                     result = pthread_cond_timedwait(&wfmo->CVariable, &wfmo->Mutex, &ts);
                 } else {
                     result = pthread_cond_wait(&wfmo->CVariable, &wfmo->Mutex);
@@ -513,11 +513,11 @@ namespace neosmart {
         HANDLE handle = static_cast<HANDLE>(event);
 
         // WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
-        if (milliseconds == INFINITE_WAIT || (milliseconds >> 32) == 0) {
+        if (milliseconds == WAIT_INFINITE || (milliseconds >> 32) == 0) {
             result = WaitForSingleObject(handle, static_cast<uint32_t>(milliseconds));
         } else {
             // Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
-            uint32_t waitUnit = (INFINITE - 1);
+            uint32_t waitUnit = (WAIT_INFINITE - 1);
             uint64_t rounds = milliseconds / waitUnit;
             uint32_t remainder = milliseconds % waitUnit;
 
@@ -562,12 +562,12 @@ namespace neosmart {
         uint32_t result = 0;
 
         // WaitForSingleObject(Ex) and WaitForMultipleObjects(Ex) only support 32-bit timeout
-        if (milliseconds == INFINITE_WAIT || (milliseconds >> 32) == 0) {
+        if (milliseconds == WAIT_INFINITE || (milliseconds >> 32) == 0) {
             result = WaitForMultipleObjects(count, handles, waitAll,
                                             static_cast<uint32_t>(milliseconds));
         } else {
             // Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
-            uint32_t waitUnit = (INFINITE - 1);
+            uint32_t waitUnit = (WAIT_INFINITE - 1);
             uint64_t rounds = milliseconds / waitUnit;
             uint32_t remainder = milliseconds % waitUnit;
 
