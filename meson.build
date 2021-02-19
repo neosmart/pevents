@@ -1,4 +1,5 @@
-project('pevents', ['cpp'])
+project('pevents', ['cpp'],
+		default_options: ['warning_level=3'])
 
 args = []
 if get_option('wfmo')
