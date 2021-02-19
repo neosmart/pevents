@@ -15,7 +15,7 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    
+
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
@@ -27,18 +27,18 @@ jobs:
       - name: meson build
         run: |
           meson build
-      
+
       - name: ninja
         run: |
           ninja -C build
-      
+
       - name: ninja test
         run: |
           ninja -C build test
 
   macOS:
     runs-on: macos-latest
-    
+
     steps:
       - uses: actions/checkout@v2
 
@@ -49,12 +49,12 @@ jobs:
 
       - name: meson build
         run: |
-          meson build
-      
+          meson setup --backend xcode build
+
       - name: ninja
         run: |
-          ninja -C build
-      
+          meson compile -C build
+
       - name: ninja test
         run: |
-          ninja -C build test
+          meson test -C build
