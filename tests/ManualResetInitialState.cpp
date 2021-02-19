@@ -18,7 +18,7 @@ bool InitiallyUnset() {
     return result == WAIT_TIMEOUT;
 }
 
-int main(int argc, const char *argv[]) {
+int main() {
     if (!InitiallySet()) {
         std::cout << "InitiallySet test failed!" << std::endl;
         return 1;
