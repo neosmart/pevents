@@ -5,7 +5,7 @@
 #include "pevents.h"
 
 int main() {
-    std::vector<neosmart::pthread_event_t> lPEvents(63); // Can be any number of events from 1-N.
+    std::vector<neosmart::pevent_t> lPEvents(63); // Can be any number of events from 1-N.
     for (auto &lEvent : lPEvents) {
         // Manual or Auto-Reset Events (doesn't matter which kind), and all already set.
         //

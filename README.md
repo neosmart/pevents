@@ -60,23 +60,23 @@ correct¹.
 Linux, and a common pitfall for developers coming from the Windows world.*
 
 ```cpp
-pthread_event_t CreateEvent(bool manualReset, bool initialState);
+pevent_t CreateEvent(bool manualReset, bool initialState);
 
-int DestroyEvent(pthread_event_t event);
+int DestroyEvent(pevent_t event);
 
-int WaitForEvent(pthread_event_t event, uint64_t milliseconds);
+int WaitForEvent(pevent_t event, uint64_t milliseconds);
 
-int WaitForMultipleEvents(pthread_event_t *events, int count,
+int WaitForMultipleEvents(pevent_t *events, int count,
 		bool waitAll, uint64_t milliseconds);
 
-int WaitForMultipleEvents(pthread_event_t *events, int count,
+int WaitForMultipleEvents(pevent_t *events, int count,
 		bool waitAll, uint64_t milliseconds, int &index);
 
-int SetEvent(pthread_event_t event);
+int SetEvent(pevent_t event);
 
-int ResetEvent(pthread_event_t event);
+int ResetEvent(pevent_t event);
 
-int PulseEvent(pthread_event_t event);
+int PulseEvent(pevent_t event);
 ```
 
 ## Building and using pevents

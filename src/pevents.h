@@ -19,25 +19,25 @@
 
 namespace neosmart {
     // Type declarations
-    struct pthread_event_t_;
-    typedef pthread_event_t_ *pthread_event_t;
+    struct pevent_t_;
+    typedef pevent_t_ *pevent_t;
 
     // Constant declarations
     const uint64_t WAIT_INFINITE = ~((unsigned long long)0);
 
     // Function declarations
-    pthread_event_t CreateEvent(bool manualReset = false, bool initialState = false);
-    int DestroyEvent(pthread_event_t event);
-    int WaitForEvent(pthread_event_t event, uint64_t milliseconds = WAIT_INFINITE);
-    int SetEvent(pthread_event_t event);
-    int ResetEvent(pthread_event_t event);
+    pevent_t CreateEvent(bool manualReset = false, bool initialState = false);
+    int DestroyEvent(pevent_t event);
+    int WaitForEvent(pevent_t event, uint64_t milliseconds = WAIT_INFINITE);
+    int SetEvent(pevent_t event);
+    int ResetEvent(pevent_t event);
 #ifdef WFMO
-    int WaitForMultipleEvents(pthread_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds);
-    int WaitForMultipleEvents(pthread_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds, int &index);
 #endif
 #ifdef PULSE
-    int PulseEvent(pthread_event_t event);
+    int PulseEvent(pevent_t event);
 #endif
 } // namespace neosmart
