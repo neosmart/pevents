@@ -19,6 +19,12 @@
 #endif
 #include "pevents.h"
 
+#ifdef _WIN32
+#define __unused__  [[maybe_unused]]
+#else
+#define __unused__ __attribute__((unused))
+#endif
+
 using namespace neosmart;
 using namespace std;
 
@@ -33,7 +39,7 @@ int number;
 char lastChar = '\0';
 int lastNum = -1;
 
-void intHandler(__attribute__((unused)) int sig) {
+void intHandler(__unused__ int sig) {
     // Unfortunately you can't use SetEvent here because posix signal handlers
     // shouldn't use any non-reentrant code (like printf).
     // On x86/x64, std::atomic<bool> is just a fancy way of doing a memory

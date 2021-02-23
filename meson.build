@@ -18,7 +18,8 @@ pevents = static_library('pevents', srcs,
 	cpp_args: args,
 	dependencies: [pthreads])
 
-pevents = declare_dependency(include_directories: include_directories('.'),
+pevents = declare_dependency(
+	include_directories: include_directories('.'),
 	link_with: pevents,
 	dependencies: [pthreads])
 
@@ -33,6 +34,12 @@ wfmo_tests = [
     'WaitTimeoutAllSignalled',
   ]
 
+test_std = 'c++11'
+# Windows has deprecated C++11 support, use C++17 to get [[maybe_unused]]
+if build_machine.system() == 'windows'
+	test_std = 'c++17'
+endif
+
 # Single file include
 custom_target('pevents.hpp',
 	build_by_default: true,
@@ -46,7 +53,7 @@ custom_target('pevents.hpp',
 sample = executable('sample', ['examples/sample.cpp'],
 	include_directories: incdir,
 	cpp_args: args,
-       override_options: ['cpp_std=c++11'],
+       override_options: ['cpp_std=' + test_std],
 	dependencies: [pevents])
 
 tests = []
@@ -67,7 +74,7 @@ foreach test : tests
 		# See https://github.com/mesonbuild/meson/issues/3662
 		build_by_default: false,
 		cpp_args: test_args,
-               override_options: ['cpp_std=c++11'],
+               override_options: ['cpp_std=' + test_std],
 		include_directories: incdir,
 		dependencies: pevents)
 	test(test, exe)

@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 // Test for correct return value after calling WaitForMultipleObjects with a timeout of zero
 // but when all the events are actually set. Contributed by @CraftedHandleInvalid, see issue #5.
 #include <stdexcept>
