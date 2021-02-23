@@ -14,7 +14,7 @@ neosmart_event_t t1_finished;
 void worker() {
     WaitForEvent(event, 0);
     SetEvent(t1_started);
-    WaitForEvent(event, -1);
+    WaitForEvent(event, WAIT_INFINITE);
     SetEvent(t1_finished);
 }
 

@@ -133,7 +133,7 @@ int main() {
         }
 
         int index = -1;
-        int result = WaitForMultipleEvents(events, 2, false, -1, index);
+        int result = WaitForMultipleEvents(events, 2, false, WAIT_INFINITE, index);
 
         if (result == WAIT_TIMEOUT) {
             cout << "Timeout!" << endl;
