@@ -567,7 +567,7 @@ namespace neosmart {
                                             static_cast<uint32_t>(milliseconds));
         } else {
             // Cannot wait for 0xFFFFFFFF because that means infinity to WIN32
-            uint32_t waitUnit = (WAIT_INFINITE - 1);
+            uint32_t waitUnit = static_cast<uint32_t>(WAIT_INFINITE) - 1;
             uint64_t rounds = milliseconds / waitUnit;
             uint32_t remainder = milliseconds % waitUnit;
 
