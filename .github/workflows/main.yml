@@ -47,8 +47,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install python3 ninja
-          sudo pip3 install meson
+          sudo pip3 install meson ninja
 
       - name: meson build
         run: |
