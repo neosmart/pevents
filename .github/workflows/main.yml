@@ -36,6 +36,9 @@ jobs:
         run: |
           ninja -C build test
 
+      - run: meson --reconfigure -D wfmo=false build/
+      - run: ninja -C build/ test
+
   macOS:
     runs-on: macos-latest
 
@@ -66,11 +69,8 @@ jobs:
       CXX: CL.exe
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v2
-
-      - name: install python
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
 
       - name: use msvc x64 toolchain
         uses: ilammy/msvc-dev-cmd@v1
