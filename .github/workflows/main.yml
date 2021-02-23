@@ -61,14 +61,41 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    env:
+      CC: CL.exe
+      CXX: CL.exe
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
-      - uses: BSFishy/meson-build@v1.0.2
+      - name: checkout code
+        uses: actions/checkout@v2
+
+      - name: install python
+        uses: actions/setup-python@v1
+
+      - name: use msvc x64 toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: build and test (msvc x64)
+        uses: BSFishy/meson-build@v1.0.2
         with:
           action: test
           directory: build
           # options: --verbose
           meson-version: 0.57.1
           ninja-version: 1.10.0.post2
+
+      - name: use msvc x86 toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      - name: build and test (msvc x86)
+        uses: BSFishy/meson-build@v1.0.2
+        with:
+          action: test
+          directory: build_x86
+          meson-version: 0.57.1
+          ninja-version: 1.10.0.post2
+
