@@ -28,7 +28,7 @@
 using namespace neosmart;
 using namespace std;
 
-neosmart_event_t events[5];           // letters, numbers, abort, letterSync, numberSync
+pevent_t events[5];           // letters, numbers, abort, letterSync, numberSync
 std::atomic<bool> interrupted{false}; // for signal handling
 
 // By leaving these originally unassigned, any access to unitialized memory

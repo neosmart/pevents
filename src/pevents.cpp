@@ -50,7 +50,7 @@ namespace neosmart {
 #endif // WFMO
 
     // The basic event structure, passed to the caller as an opaque pointer when creating events
-    struct neosmart_event_t_ {
+    struct pevent_t_ {
         pthread_cond_t CVariable;
         pthread_mutex_t Mutex;
         bool AutoReset;
@@ -91,8 +91,8 @@ namespace neosmart {
     }
 #endif // WFMO
 
-    neosmart_event_t CreateEvent(bool manualReset, bool initialState) {
-        neosmart_event_t event = new neosmart_event_t_;
+    pevent_t CreateEvent(bool manualReset, bool initialState) {
+        pevent_t event = new pevent_t_;
 
         int result = pthread_cond_init(&event->CVariable, 0);
         assert(result == 0);
@@ -111,7 +111,7 @@ namespace neosmart {
         return event;
     }
 
-    static int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
+    static int UnlockedWaitForEvent(pevent_t event, uint64_t milliseconds) {
         int result = 0;
         if (!event->State) {
             // Zero-timeout event state check optimization
@@ -157,7 +157,7 @@ namespace neosmart {
         return result;
     }
 
-    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
+    int WaitForEvent(pevent_t event, uint64_t milliseconds) {
         int tempResult;
         if (milliseconds == 0) {
             tempResult = pthread_mutex_trylock(&event->Mutex);
@@ -179,13 +179,13 @@ namespace neosmart {
     }
 
 #ifdef WFMO
-    int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds) {
         int unused;
         return WaitForMultipleEvents(events, count, waitAll, milliseconds, unused);
     }
 
-    int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds, int &waitIndex) {
         neosmart_wfmo_t wfmo = new neosmart_wfmo_t_;
 
@@ -315,7 +315,7 @@ namespace neosmart {
     }
 #endif // WFMO
 
-    int DestroyEvent(neosmart_event_t event) {
+    int DestroyEvent(pevent_t event) {
         int result = 0;
 
 #ifdef WFMO
@@ -340,7 +340,7 @@ namespace neosmart {
         return 0;
     }
 
-    int SetEvent(neosmart_event_t event) {
+    int SetEvent(pevent_t event) {
         int result = pthread_mutex_lock(&event->Mutex);
         assert(result == 0);
 
@@ -459,7 +459,7 @@ namespace neosmart {
         return 0;
     }
 
-    int ResetEvent(neosmart_event_t event) {
+    int ResetEvent(pevent_t event) {
         int result = pthread_mutex_lock(&event->Mutex);
         assert(result == 0);
 
@@ -472,7 +472,7 @@ namespace neosmart {
     }
 
 #ifdef PULSE
-    int PulseEvent(neosmart_event_t event) {
+    int PulseEvent(pevent_t event) {
         // This may look like it's a horribly inefficient kludge with the sole intention of reducing
         // code duplication, but in reality this is what any PulseEvent() implementation must look
         // like. The only overhead (function calls aside, which your compiler will likely optimize
@@ -499,16 +499,16 @@ namespace neosmart {
 #include "pevents.h"
 
 namespace neosmart {
-    neosmart_event_t CreateEvent(bool manualReset, bool initialState) {
-        return static_cast<neosmart_event_t>(::CreateEvent(NULL, manualReset, initialState, NULL));
+    pevent_t CreateEvent(bool manualReset, bool initialState) {
+        return static_cast<pevent_t>(::CreateEvent(NULL, manualReset, initialState, NULL));
     }
 
-    int DestroyEvent(neosmart_event_t event) {
+    int DestroyEvent(pevent_t event) {
         HANDLE handle = static_cast<HANDLE>(event);
         return CloseHandle(handle) ? 0 : GetLastError();
     }
 
-    int WaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
+    int WaitForEvent(pevent_t event, uint64_t milliseconds) {
         uint32_t result = 0;
         HANDLE handle = static_cast<HANDLE>(event);
 
@@ -539,24 +539,24 @@ namespace neosmart {
         return GetLastError();
     }
 
-    int SetEvent(neosmart_event_t event) {
+    int SetEvent(pevent_t event) {
         HANDLE handle = static_cast<HANDLE>(event);
         return ::SetEvent(handle) ? 0 : GetLastError();
     }
 
-    int ResetEvent(neosmart_event_t event) {
+    int ResetEvent(pevent_t event) {
         HANDLE handle = static_cast<HANDLE>(event);
         return ::ResetEvent(handle) ? 0 : GetLastError();
     }
 
 #ifdef WFMO
-    int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds) {
         int index = 0;
         return WaitForMultipleEvents(events, count, waitAll, milliseconds, index);
     }
 
-    int WaitForMultipleEvents(neosmart_event_t *events, int count, bool waitAll,
+    int WaitForMultipleEvents(pevent_t *events, int count, bool waitAll,
                               uint64_t milliseconds, int &index) {
         HANDLE *handles = reinterpret_cast<HANDLE *>(events);
         uint32_t result = 0;
@@ -593,7 +593,7 @@ namespace neosmart {
 #endif
 
 #ifdef PULSE
-    int PulseEvent(neosmart_event_t event) {
+    int PulseEvent(pevent_t event) {
         HANDLE handle = static_cast<HANDLE>(event);
         return ::PulseEvent(handle) ? 0 : GetLastError();
     }
