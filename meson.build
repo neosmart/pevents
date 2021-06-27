@@ -28,6 +28,7 @@ basic_tests = ['ManualResetInitialState',
 		'AutoResetInitialState',
 		'ManualResetBasicTests',
 		'AutoResetBasicTests',
+		'EventContention',
 	]
 # Tests that required wfmo
 wfmo_tests = [
