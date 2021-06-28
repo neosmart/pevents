@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <atomic>
+#include <memory>
 #ifdef WFMO
 #include <algorithm>
 #include <deque>
@@ -54,7 +56,7 @@ namespace neosmart {
         pthread_cond_t CVariable;
         pthread_mutex_t Mutex;
         bool AutoReset;
-        bool State;
+        std::atomic<bool> State;
 #ifdef WFMO
         std::deque<neosmart_wfmo_info_t_> RegisteredWaits;
 #endif
@@ -100,7 +102,8 @@ namespace neosmart {
         result = pthread_mutex_init(&event->Mutex, 0);
         assert(result == 0);
 
-        event->State = false;
+        // memory_order_relaxed: Newly created event is guaranteed to not have any waiters
+        event->State.store(false, std::memory_order_relaxed);
         event->AutoReset = !manualReset;
 
         if (initialState) {
@@ -113,7 +116,8 @@ namespace neosmart {
 
     static int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
         int result = 0;
-        if (!event->State) {
+        // memory_order_relaxed: unlocking/ordering is guaranteed prior to calling this function
+        if (!event->State.load(std::memory_order_relaxed)) {
             // Zero-timeout event state check optimization
             if (milliseconds == 0) {
                 return WAIT_TIMEOUT;
@@ -139,17 +143,20 @@ namespace neosmart {
                 } else {
                     result = pthread_cond_wait(&event->CVariable, &event->Mutex);
                 }
-            } while (result == 0 && !event->State);
+                // memory_order_relaxed: ordering is guaranteed by the mutex
+            } while (result == 0 && !event->State.load(std::memory_order_relaxed));
 
             if (result == 0 && event->AutoReset) {
                 // We've only accquired the event if the wait succeeded
-                event->State = false;
+                // memory_order_release: Prevent overlapping/interleaved Set/Reset contexts
+                event->State.store(false, std::memory_order_release);
             }
         } else if (event->AutoReset) {
             // It's an auto-reset event that's currently available;
             // we need to stop anyone else from using it
             result = 0;
-            event->State = false;
+            // memory_order_release: Prevent overlapping/interleaved Set/Reset contexts
+            event->State.store(false, std::memory_order_release);
         }
         // Else we're trying to obtain a manual reset event with a signaled state;
         // don't do anything
@@ -158,21 +165,19 @@ namespace neosmart {
     }
 
     int WaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
-        int tempResult;
-        if (milliseconds == 0) {
-            tempResult = pthread_mutex_trylock(&event->Mutex);
-            if (tempResult == EBUSY) {
-                return WAIT_TIMEOUT;
-            }
+        // Optimization: bypass acquiring the event lock if the state atomic is unavailable.
+        // memory_order_relaxed: This is just an optimization, it's OK to be biased towards a stale
+        // value here, and preferable to synchronizing CPU caches to get a more accurate result.
+        if (milliseconds == 0 && !event->State.load(std::memory_order_relaxed)) {
+            return WAIT_TIMEOUT;
         } else {
-            tempResult = pthread_mutex_lock(&event->Mutex);
+            int result = pthread_mutex_lock(&event->Mutex);
+            assert(result == 0);
         }
-
-        assert(tempResult == 0);
 
         int result = UnlockedWaitForEvent(event, milliseconds);
 
-        tempResult = pthread_mutex_unlock(&event->Mutex);
+        int tempResult = pthread_mutex_unlock(&event->Mutex);
         assert(tempResult == 0);
 
         return result;
@@ -344,7 +349,8 @@ namespace neosmart {
         int result = pthread_mutex_lock(&event->Mutex);
         assert(result == 0);
 
-        event->State = true;
+        // memory_order_release: Unblock threads waiting for the event
+        event->State.store(true, std::memory_order_release);
 
         // Depending on the event type, we either trigger everyone or only one
         if (event->AutoReset) {
@@ -369,8 +375,6 @@ namespace neosmart {
                     continue;
                 }
 
-                event->State = false;
-
                 if (i->Waiter->WaitAll) {
                     --i->Waiter->Status.EventsLeft;
                     assert(i->Waiter->Status.EventsLeft >= 0);
@@ -391,14 +395,18 @@ namespace neosmart {
 
                 event->RegisteredWaits.pop_front();
 
+                // memory_order_release: Prevent overlapping of sequential Set/Reset states.
+                event->State.store(false, std::memory_order_release);
+
                 result = pthread_mutex_unlock(&event->Mutex);
                 assert(result == 0);
 
                 return 0;
             }
 #endif // WFMO
-       // event->State can be false if compiled with WFMO support
-            if (event->State) {
+            // event->State can be false if compiled with WFMO support
+            // memory_order_relaxed: ordering is ensured by the mutex
+            if (event->State.load(std::memory_order_relaxed)) {
                 result = pthread_mutex_unlock(&event->Mutex);
                 assert(result == 0);
 
@@ -407,7 +415,7 @@ namespace neosmart {
 
                 return 0;
             }
-        } else {
+        } else { // this is a manual reset event
 #ifdef WFMO
             for (size_t i = 0; i < event->RegisteredWaits.size(); ++i) {
                 neosmart_wfmo_info_t info = &event->RegisteredWaits[i];
@@ -463,7 +471,9 @@ namespace neosmart {
         int result = pthread_mutex_lock(&event->Mutex);
         assert(result == 0);
 
-        event->State = false;
+        // memory_order_release: Prevent sequential Set/Reset calls from overlapping, this seems to
+        // be required per https://old.reddit.com/r/cpp/comments/g84bzv/c/fpua2yq/
+        event->State.store(false, std::memory_order_release);
 
         result = pthread_mutex_unlock(&event->Mutex);
         assert(result == 0);
@@ -493,7 +503,7 @@ namespace neosmart {
 #endif
 } // namespace neosmart
 
-#else //_WIN32
+#else // _WIN32
 
 #include <Windows.h>
 #include "pevents.h"
