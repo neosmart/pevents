@@ -27,7 +27,7 @@ namespace neosmart {
     struct neosmart_wfmo_t_ {
         pthread_mutex_t Mutex;
         pthread_cond_t CVariable;
-        int RefCount;
+        std::atomic<int> RefCount;
         union {
             int FiredEvent; // WFSO
             int EventsLeft; // WFMO
@@ -64,32 +64,18 @@ namespace neosmart {
 
 #ifdef WFMO
     static bool RemoveExpiredWaitHelper(neosmart_wfmo_info_t_ wait) {
-        int result = pthread_mutex_trylock(&wait.Waiter->Mutex);
-
-        if (result == EBUSY) {
+        if (wait.Waiter->StillWaiting) {
             return false;
         }
 
-        assert(result == 0);
+        int ref_count = --wait.Waiter->RefCount;
+        assert(ref_count >= 0);
 
-        if (wait.Waiter->StillWaiting == false) {
-            --wait.Waiter->RefCount;
-            assert(wait.Waiter->RefCount >= 0);
-            bool destroy = wait.Waiter->RefCount == 0;
-            result = pthread_mutex_unlock(&wait.Waiter->Mutex);
-            assert(result == 0);
-            if (destroy) {
-                wait.Waiter->Destroy();
-                delete wait.Waiter;
-            }
-
-            return true;
+        if (ref_count == 0) {
+            wait.Waiter->Destroy();
+            delete wait.Waiter;
         }
-
-        result = pthread_mutex_unlock(&wait.Waiter->Mutex);
-        assert(result == 0);
-
-        return false;
+        return true;
     }
 #endif // WFMO
 
@@ -250,7 +236,7 @@ namespace neosmart {
                 }
             } else {
                 events[i]->RegisteredWaits.push_back(waitInfo);
-                ++wfmo->RefCount;
+                wfmo->RefCount.fetch_add(1, std::memory_order_relaxed);
 
                 tempResult = pthread_mutex_unlock(&events[i]->Mutex);
                 assert(tempResult == 0);
@@ -306,12 +292,12 @@ namespace neosmart {
         waitIndex = wfmo->Status.FiredEvent;
         wfmo->StillWaiting = false;
 
-        --wfmo->RefCount;
-        assert(wfmo->RefCount >= 0);
-        bool destroy = wfmo->RefCount == 0;
         tempResult = pthread_mutex_unlock(&wfmo->Mutex);
         assert(tempResult == 0);
-        if (destroy) {
+
+        int ref_count = --wfmo->RefCount;
+        assert(ref_count >= 0);
+        if (ref_count == 0) {
             wfmo->Destroy();
             delete wfmo;
         }
@@ -361,18 +347,21 @@ namespace neosmart {
                 result = pthread_mutex_lock(&i->Waiter->Mutex);
                 assert(result == 0);
 
-                --i->Waiter->RefCount;
-                assert(i->Waiter->RefCount >= 0);
+                int ref_count = --i->Waiter->RefCount;
+                assert(ref_count >= 0);
                 if (!i->Waiter->StillWaiting) {
-                    bool destroy = i->Waiter->RefCount == 0;
                     result = pthread_mutex_unlock(&i->Waiter->Mutex);
                     assert(result == 0);
-                    if (destroy) {
+
+                    if (ref_count == 0) {
                         i->Waiter->Destroy();
                         delete i->Waiter;
                     }
                     event->RegisteredWaits.pop_front();
                     continue;
+                }
+                else {
+                    assert(ref_count > 0);
                 }
 
                 if (i->Waiter->WaitAll) {
@@ -471,8 +460,6 @@ namespace neosmart {
         int result = pthread_mutex_lock(&event->Mutex);
         assert(result == 0);
 
-        // memory_order_release: Prevent sequential Set/Reset calls from overlapping, this seems to
-        // be required per https://old.reddit.com/r/cpp/comments/g84bzv/c/fpua2yq/
         event->State.store(false, std::memory_order_release);
 
         result = pthread_mutex_unlock(&event->Mutex);
