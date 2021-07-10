@@ -294,8 +294,7 @@ namespace neosmart {
 
         if (waitAll) {
             // Decrement EventsLeft in one go to avoid cache line pressure.
-            int left = wfmo->Status.EventsLeft.fetch_sub(events_skipped, std::memory_order_acq_rel);
-            assert(left > 0);
+            wfmo->Status.EventsLeft.fetch_sub(events_skipped, std::memory_order_acq_rel);
         }
 
         timespec ts;
