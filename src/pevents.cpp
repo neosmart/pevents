@@ -145,25 +145,20 @@ namespace neosmart {
             // memory_order_relaxed: we never act on `State == true` without fully synchronizing
             // or grabbing the mutex, so it's OK to use relaxed semantics here.
             event->State.store(false, std::memory_order_relaxed);
-        }
 
 #ifdef WFMO
-        // Un-signal any registered waiters in case of an auto-reset event
-        // memory_order_relaxed: we are only trying to observe previous writes in this same thread.
-        if (!event->State.load(std::memory_order_relaxed)) {
+            // Un-signal any registered waiters in case of an auto-reset event
             for (auto &wfmo : event->RegisteredWaits) {
                 // We don't need to lock the WFMO mutex because the event mutex is required to
                 // change the event-specific `Signalled` flag, and `Status.EventsLeft` is
                 // synchronized separately.
-                if (wfmo.Signalled) {
+                if (wfmo.Signalled && wfmo.Waiter->WaitAll) {
                     wfmo.Signalled = false;
-                    if (wfmo.Waiter->WaitAll) {
-                        wfmo.Waiter->Status.EventsLeft.fetch_add(1, std::memory_order_acq_rel);
-                    }
+                    wfmo.Waiter->Status.EventsLeft.fetch_add(1, std::memory_order_acq_rel);
                 }
             }
-        }
 #endif
+        }
 
         return result;
     }
@@ -343,11 +338,17 @@ namespace neosmart {
                     }
 
                     assert(tempResult == 0);
+                    // If multiple WFME calls are made and they overlap in one or more auto reset
+                    // events, they will race to obtain the event, as a result of which the
+                    // previously signalled/fired event may no longer be available by the time we
+                    // get to this point.
                     // memory_order_relaxed: `State` isn't changed without the mutex held.
                     if (!events[i]->State.load(std::memory_order_relaxed)) {
                         // The event has been stolen from under us; since we hold the WFMO lock, it
                         // should be safe to sleep until a relevant SetEvent() call is made. But
                         // first, release all the locks we've accumulated.
+                        // We do not have to reset the WFMO object's event-specific signalled state
+                        // since whichever thread actually ends up snagging the event does that.
                         for (int j = i; j >= 0; --j) {
                             tempResult = pthread_mutex_unlock(&events[j]->Mutex);
                             assert(tempResult == 0);
@@ -494,8 +495,7 @@ namespace neosmart {
                     i->Waiter->Status.FiredEvent = i->WaitIndex;
 
                     // If the waiter is waiting on any single event, just consume the call to
-                    // SetEvent() that brought us here (in case of an auto-reset event) and
-                    // stop.
+                    // SetEvent() that brought us here (in case of an auto-reset event) and stop.
                     if (event->AutoReset) {
                         consumed = true;
                     }
@@ -536,6 +536,11 @@ namespace neosmart {
         }
 
         if (consumed) {
+            // This assert verifies that there were no lost wakeups associated with a previous call
+            // to SetEvent, since we never actually explicitly set !State anywhere yet.
+            // memory_order_relaxed: we are observing a field only ever changed with the mutex held.
+            assert(event->State.load(std::memory_order_relaxed) == false);
+
             result = pthread_mutex_unlock(&event->Mutex);
             assert(result == 0);
             return 0;
