@@ -98,6 +98,10 @@ namespace neosmart {
         return event;
     }
 
+    inline static uint64_t TimeValToNanos(const timeval &tv) {
+        return ((uint64_t)tv.tv_sec) * 1000 * 1000 * 1000 + ((uint64_t)tv.tv_usec) * 1000;
+    }
+
     static int UnlockedWaitForEvent(neosmart_event_t event, uint64_t milliseconds) {
         int result = 0;
         // memory_order_relaxed: `State` is only set to true with the mutex held, and we require
@@ -111,11 +115,9 @@ namespace neosmart {
             timespec ts;
             if (milliseconds != WAIT_INFINITE) {
                 timeval tv;
-                gettimeofday(&tv, NULL);
+                gettimeofday(&tv, nullptr);
 
-                uint64_t nanoseconds = ((uint64_t)tv.tv_sec) * 1000 * 1000 * 1000 +
-                                       milliseconds * 1000 * 1000 + ((uint64_t)tv.tv_usec) * 1000;
-
+                uint64_t nanoseconds = TimeValToNanos(tv) + milliseconds * 1000 * 1000;
                 ts.tv_sec = (time_t) (nanoseconds / 1000 / 1000 / 1000);
                 ts.tv_nsec = (long) (nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
             }
@@ -298,15 +300,21 @@ namespace neosmart {
         }
 
         timespec ts;
+        uint64_t tsNanos;
+
+        // GCC 10 incorrectly generates a -Wmaybe-uninitialized warning for tsNanos, but only w/ -Ox
+        // We leave it uninitialized to let other compilers complain if it really does end up being
+        // used uninitialized in a different codepath.
+#if defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER)
+        tsNanos = 0;
+#endif
         if (!done && milliseconds != WAIT_INFINITE && milliseconds != 0) {
             timeval tv;
-            gettimeofday(&tv, NULL);
+            gettimeofday(&tv, nullptr);
 
-            uint64_t nanoseconds = ((uint64_t)tv.tv_sec) * 1000 * 1000 * 1000 +
-                                   milliseconds * 1000 * 1000 + ((uint64_t)tv.tv_usec) * 1000;
-
-            ts.tv_sec = (time_t)(nanoseconds / 1000 / 1000 / 1000);
-            ts.tv_nsec = (long)(nanoseconds - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
+            tsNanos = TimeValToNanos(tv) + milliseconds * 1000 * 1000;
+            ts.tv_sec = (time_t)(tsNanos / 1000 / 1000 / 1000);
+            ts.tv_nsec = (long)(tsNanos - ((uint64_t)ts.tv_sec) * 1000 * 1000 * 1000);
         }
 
         while (!done) {
@@ -320,7 +328,9 @@ namespace neosmart {
                 // All events are currently signalled, but we must atomically obtain them before
                 // returning.
 
+                uint8_t round = 0;
             retry:
+                ++round;
                 bool lockedAtomically = true;
                 for (int i = 0; i < count; ++i) {
                     tempResult = pthread_mutex_trylock(&events[i]->Mutex);
@@ -333,7 +343,25 @@ namespace neosmart {
                             tempResult = pthread_mutex_unlock(&events[j]->Mutex);
                             assert(tempResult == 0);
                         }
+
+                        // Make sure we don't endlessly try to obtain all the locks past our
+                        // deadline in cases of heavy contention.
+                        if (milliseconds != WAIT_INFINITE && (round % 10) == 0) {
+                            timeval tv;
+                            gettimeofday(&tv, nullptr);
+                            if (milliseconds == 0 || TimeValToNanos(tv) > tsNanos) {
+                                result = WAIT_TIMEOUT;
+                                done = true;
+                                break;
+                            }
+                        }
+
                         goto retry;
+                    }
+
+                    if (done) {
+                        // Timeout from above
+                        break;
                     }
 
                     assert(tempResult == 0);
@@ -357,7 +385,7 @@ namespace neosmart {
                     }
                 }
 
-                if (lockedAtomically) {
+                if (!done && lockedAtomically) {
                     // We have all the locks, so we can atomically consume all the events
                     for (int i = 0; i < count; ++i) {
                         tempResult = UnlockedWaitForEvent(events[i], 0);
