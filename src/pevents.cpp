@@ -154,14 +154,22 @@ namespace neosmart {
         // value here, and preferable to synchronizing CPU caches to get a more accurate result.
         if (milliseconds == 0 && !event->State.load(std::memory_order_relaxed)) {
             return WAIT_TIMEOUT;
-        } else {
-            int result = pthread_mutex_lock(&event->Mutex);
-            assert(result == 0);
         }
+        // Optimization: early return in case of success for manual reset events only.
+        if (!event->AutoReset && event->State.load(std::memory_order_relaxed)) {
+            // A memory barrier is required here. This is still cheaper than a syscall.
+            // See https://github.com/neosmart/pevents/issues/18
+            if (event->State.load(std::memory_order_acquire)) {
+                return 0;
+            }
+        }
+
+        int tempResult = pthread_mutex_lock(&event->Mutex);
+        assert(tempResult == 0);
 
         int result = UnlockedWaitForEvent(event, milliseconds);
 
-        int tempResult = pthread_mutex_unlock(&event->Mutex);
+        tempResult = pthread_mutex_unlock(&event->Mutex);
         assert(tempResult == 0);
 
         return result;
