@@ -14,7 +14,6 @@
 #include <memory>
 #include <pthread.h>
 #include <sys/time.h>
-#include <vector>
 #ifdef WFMO
 #include <algorithm>
 #include <deque>
