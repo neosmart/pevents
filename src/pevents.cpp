@@ -220,20 +220,34 @@ namespace neosmart {
         for (int i = 0; i < count; ++i) {
             waitInfo.WaitIndex = i;
 
-            // Must not release lock until RegisteredWait is potentially added
-            tempResult = pthread_mutex_lock(&events[i]->Mutex);
-            assert(tempResult == 0);
+            // Skip obtaining the mutex for manual reset events. This requires a memory barrier to
+            // ensure correctness.
+            bool skipLock = false;
+            if (!events[i]->AutoReset) {
+                if (events[i]->State.load(std::memory_order_relaxed) &&
+                    events[i]->State.load(std::memory_order_acquire)) {
+                    skipLock = true;
+                }
+            }
 
-            // Before adding this wait to the list of registered waits, let's clean up old, expired
-            // waits while we have the event lock anyway
-            events[i]->RegisteredWaits.erase(std::remove_if(events[i]->RegisteredWaits.begin(),
-                                                            events[i]->RegisteredWaits.end(),
-                                                            RemoveExpiredWaitHelper),
-                                             events[i]->RegisteredWaits.end());
-
-            if (UnlockedWaitForEvent(events[i], 0) == 0) {
-                tempResult = pthread_mutex_unlock(&events[i]->Mutex);
+            if (!skipLock) {
+                // Must not release lock until RegisteredWait is potentially added
+                tempResult = pthread_mutex_lock(&events[i]->Mutex);
                 assert(tempResult == 0);
+
+                // Before adding this wait to the list of registered waits, let's clean up old,
+                // expired waits while we have the event lock anyway.
+                events[i]->RegisteredWaits.erase(std::remove_if(events[i]->RegisteredWaits.begin(),
+                                                                events[i]->RegisteredWaits.end(),
+                                                                RemoveExpiredWaitHelper),
+                                                 events[i]->RegisteredWaits.end());
+            }
+
+            if (skipLock || UnlockedWaitForEvent(events[i], 0) == 0) {
+                if (!skipLock) {
+                    tempResult = pthread_mutex_unlock(&events[i]->Mutex);
+                    assert(tempResult == 0);
+                }
 
                 if (waitAll) {
                     ++skipped_refs;
