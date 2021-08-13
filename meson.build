@@ -52,10 +52,15 @@ custom_target('pevents.hpp',
 
 # Sample program demonstrating capabilities
 if get_option('wfmo')
-	sample = executable('sample', ['examples/sample.cpp'],
+	sample = executable('sample0', ['examples/sample0.cpp'],
 		include_directories: incdir,
 		cpp_args: args,
-		   override_options: ['cpp_std=' + test_std],
+		override_options: ['cpp_std=' + test_std],
+		dependencies: [pevents])
+	sample = executable('sample1', ['examples/sample1.cpp'],
+		include_directories: incdir,
+		cpp_args: args,
+		override_options: ['cpp_std=' + test_std],
 		dependencies: [pevents])
 endif
 
