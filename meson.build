@@ -83,10 +83,11 @@ foreach test : tests
 	test(test, exe)
 endforeach
 
-# Generate a "test" to run all tests under valgrind
+# Add the option of running tests under valgrind, and do it by default if it's found.
+valgrind = find_program('valgrind')
 add_test_setup('valgrind',
 		exe_wrapper: find_program('valgrind.sh'),
 		gdb: false,
-		is_default: true,
+		is_default: valgrind.found(),
 		timeout_multiplier: 1
 )
