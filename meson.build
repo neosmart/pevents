@@ -83,3 +83,10 @@ foreach test : tests
 	test(test, exe)
 endforeach
 
+# Generate a "test" to run all tests under valgrind
+add_test_setup('valgrind',
+		exe_wrapper: find_program('valgrind.sh'),
+		gdb: false,
+		is_default: true,
+		timeout_multiplier: 1
+)
