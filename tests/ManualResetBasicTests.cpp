@@ -24,7 +24,6 @@ int main() {
     t1_finished = CreateEvent(true, false);
 
     std::thread t1(worker);
-    t1.detach();
     WaitForEvent(t1_started);
     if (WaitForEvent(t1_finished, 0) == 0) {
         std::cout << "t1_finished is set even though event has not been set!" << std::endl;
@@ -38,6 +37,12 @@ int main() {
         std::cout << "Timeout waiting for t1_finished!" << std::endl;
         return WAIT_TIMEOUT;
     }
+
+    DestroyEvent(event);
+    DestroyEvent(t1_started);
+    DestroyEvent(t1_finished);
+
+    t1.join();
 
     return 0;
 }
