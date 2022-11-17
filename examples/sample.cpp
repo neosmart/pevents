@@ -116,17 +116,17 @@ int main() {
     uint32_t letterThreadCount = dis(gen);
     uint32_t numberThreadCount = dis(gen);
 
-    for (uint32_t i = 0; i < letterThreadCount; ++i) {
+    for (__unused__ uint32_t i = 0; i < letterThreadCount; ++i) {
         threads.emplace_back(letters);
     }
-    for (uint32_t i = 0; i < numberThreadCount; ++i) {
+    for (__unused__ uint32_t i = 0; i < numberThreadCount; ++i) {
         threads.emplace_back(numbers);
     }
 
     printf("Started %u letter threads\n", letterThreadCount);
     printf("Started %u number threads\n", numberThreadCount);
 
-    for (uint32_t i = 0; lastChar != 'Z'; ++i) {
+    for (__unused__ uint32_t i = 0; lastChar != 'Z'; ++i) {
         if (interrupted) {
             printf("Interrupt triggered.. Aborting!\n");
             break;
