@@ -1,8 +1,8 @@
 /*
  * WIN32 Events for POSIX
  * Author: Mahmoud Al-Qudsi <mqudsi@neosmart.net>
- * Copyright (C) 2011 - 2019 by NeoSmart Technologies
- * This code is released under the terms of the MIT License
+ * Copyright (C) 2011 - 2022 by NeoSmart Technologies
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef _WIN32
