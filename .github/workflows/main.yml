@@ -44,10 +44,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: '3.x'
 
       - name: Install dependencies
         run: |
-          sudo pip3 install meson ninja
+          pip3 install meson ninja
 
       - name: meson build
         run: |
@@ -77,13 +80,13 @@ jobs:
           arch: x64
 
       - name: build and test (msvc x64)
-        uses: BSFishy/meson-build@v1.0.2
+        uses: BSFishy/meson-build@656b2a360964b249ac82905a52018921e01d875b
         with:
           action: test
           directory: build
           # options: --verbose
-          meson-version: 0.57.1
-          ninja-version: 1.10.0.post2
+          meson-version: 0.64.0
+          ninja-version: 1.11.1
 
       - name: use msvc x86 toolchain
         uses: ilammy/msvc-dev-cmd@v1
@@ -91,10 +94,10 @@ jobs:
           arch: x86
 
       - name: build and test (msvc x86)
-        uses: BSFishy/meson-build@v1.0.2
+        uses: BSFishy/meson-build@656b2a360964b249ac82905a52018921e01d875b
         with:
           action: test
           directory: build_x86
-          meson-version: 0.57.1
-          ninja-version: 1.10.0.post2
+          meson-version: 0.64.0
+          ninja-version: 1.11.1
 
