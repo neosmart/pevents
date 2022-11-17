@@ -33,6 +33,7 @@ basic_tests = ['ManualResetInitialState',
 # Tests that required wfmo
 wfmo_tests = [
     'WaitTimeoutAllSignalled',
+    'AtomicWaitAll',
   ]
 
 test_std = 'c++11'
